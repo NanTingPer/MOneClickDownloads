@@ -1,0 +1,148 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:MOneClickDownloads.App.ViewModels"
+             xmlns:m="using:MOneClickDownloads.App.Models"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="550"
+             x:Class="MOneClickDownloads.App.Views.ModDetailView"
+             x:DataType="vm:ModDetailViewModel">
+
+    <DockPanel>
+        <!-- 顶部：返回按钮 + 模组信息 -->
+        <Border DockPanel.Dock="Top" Padding="16,12">
+            <StackPanel Spacing="8">
+                <!-- 返回按钮 -->
+                <Button Content="← 返回搜索" 
+                        Command="{Binding GoBackCommand}"
+                        HorizontalAlignment="Left"
+                        Padding="8,4"/>
+                
+                <!-- 模组标题 -->
+                <TextBlock Text="{Binding ProjectTitle}" 
+                           FontSize="22" FontWeight="Bold"/>
+                
+                <!-- 模组描述 -->
+                <TextBlock Text="{Binding ProjectDescription}" 
+                           FontSize="13"
+                           TextWrapping="Wrap"
+                           MaxLines="3"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+            </StackPanel>
+        </Border>
+
+        <!-- 底部：下载状态栏 -->
+        <Border DockPanel.Dock="Bottom" Padding="16,8"
+                IsVisible="{Binding IsDownloading}">
+            <StackPanel Spacing="8">
+                <ProgressBar Value="{Binding DownloadProgressValue}" 
+                             Maximum="100" Height="8"/>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <TextBlock Text="{Binding DownloadStatus}" 
+                               FontSize="13"
+                               VerticalAlignment="Center"/>
+                    <Button Content="取消下载" 
+                            Command="{Binding CancelDownloadCommand}"
+                            Padding="8,4"/>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- 非下载时的底部状态文本 -->
+        <Border DockPanel.Dock="Bottom" Padding="16,8"
+                IsVisible="{Binding !IsDownloading}">
+            <TextBlock Text="{Binding DownloadStatus}" 
+                       FontSize="13"
+                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+        </Border>
+
+        <!-- 中部：版本分组列表 -->
+        <Panel>
+            <!-- 加载中 -->
+            <StackPanel IsVisible="{Binding IsLoading}" 
+                        HorizontalAlignment="Center" 
+                        VerticalAlignment="Center"
+                        Spacing="8">
+                <ProgressBar IsIndeterminate="True" Width="200" Height="4"/>
+                <TextBlock Text="加载版本列表中..." 
+                           FontSize="14"
+                           HorizontalAlignment="Center"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+            </StackPanel>
+
+            <!-- 版本列表 -->
+            <ScrollViewer IsVisible="{Binding !IsLoading}" Padding="16,0">
+                <ItemsControl ItemsSource="{Binding VersionGroups}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="m:McVersionGroup">
+                            <Expander Margin="0,0,0,8"
+                                      IsExpanded="False">
+                                <Expander.Header>
+                                    <TextBlock Text="{Binding MajorVersion, StringFormat='Minecraft {0}'}" 
+                                               FontSize="17" FontWeight="SemiBold"
+                                               Padding="0,4"/>
+                                </Expander.Header>
+                                <ItemsControl ItemsSource="{Binding Versions}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="m:ModVersionItem">
+                                            <Border Padding="10,6"
+                                                    Margin="0,0,0,4"
+                                                    Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                                                    CornerRadius="6"
+                                                    BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                                                    BorderThickness="1"
+                                                    Cursor="Hand">
+                                                <Panel>
+                                                    <StackPanel Orientation="Horizontal" Spacing="16">
+                                                        <!-- 版本名称 -->
+                                                        <TextBlock Text="{Binding DisplayName}" 
+                                                                   FontSize="14" FontWeight="SemiBold"
+                                                                   MinWidth="200"
+                                                                   VerticalAlignment="Center"/>
+                                                        
+                                                        <!-- 版本类型标签 -->
+                                                        <Border Padding="6,2" CornerRadius="4"
+                                                                Background="{DynamicResource ControlFillColorDefaultBrush}">
+                                                            <TextBlock Text="{Binding VersionTypeText}" 
+                                                                       FontSize="12"/>
+                                                        </Border>
+                                                        
+                                                        <!-- 加载器 -->
+                                                        <TextBlock Text="{Binding LoadersText}" 
+                                                                   FontSize="12"
+                                                                   VerticalAlignment="Center"
+                                                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                                                        
+                                                        <!-- 游戏版本 -->
+                                                        <TextBlock Text="{Binding GameVersionsText}" 
+                                                                   FontSize="12"
+                                                                   VerticalAlignment="Center"
+                                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"/>
+                                                        
+                                                        <!-- 发布日期 -->
+                                                        <TextBlock Text="{Binding DatePublishedText}" 
+                                                                   FontSize="12"
+                                                                   VerticalAlignment="Center"
+                                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"/>
+                                                    </StackPanel>
+                                                    
+                                                    <!-- 透明点击覆盖层 -->
+                                                    <Button Background="Transparent" 
+                                                            BorderThickness="0"
+                                                            HorizontalAlignment="Stretch"
+                                                            VerticalAlignment="Stretch"
+                                                            Command="{Binding $parent[UserControl].((vm:ModDetailViewModel)DataContext).DownloadVersionCommand}"
+                                                            CommandParameter="{Binding}"/>
+                                                </Panel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </Expander>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </Panel>
+    </DockPanel>
+</UserControl>

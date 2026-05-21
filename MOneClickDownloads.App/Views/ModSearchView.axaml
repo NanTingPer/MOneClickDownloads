@@ -1,0 +1,103 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:MOneClickDownloads.App.ViewModels"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="550"
+             x:Class="MOneClickDownloads.App.Views.ModSearchView"
+             x:DataType="vm:ModSearchViewModel">
+
+    <DockPanel>
+        <!-- 顶部标题区 -->
+        <Border DockPanel.Dock="Top" Padding="16,12">
+            <StackPanel>
+                <TextBlock Text="Mod 搜索" FontSize="24" FontWeight="Bold" Margin="0,0,0,12"/>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <TextBox Text="{Binding SearchQuery}" 
+                             PlaceholderText="输入 Mod 名称搜索..." 
+                             Width="400"
+                             KeyDown="OnSearchKeyDown"/>
+                    <Button Content="搜索" 
+                            Command="{Binding SearchCommand}"
+                            HorizontalContentAlignment="Center"/>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- 底部状态栏 -->
+        <Border DockPanel.Dock="Bottom" Padding="16,8">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <ProgressBar IsIndeterminate="{Binding IsLoading}" 
+                             IsVisible="{Binding IsLoading}" 
+                             Height="4" Width="200"/>
+                <TextBlock Text="{Binding StatusMessage}" 
+                           FontSize="12" 
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+            </StackPanel>
+        </Border>
+
+        <!-- 中部搜索结果列表 -->
+        <ScrollViewer Padding="16,0">
+            <ListBox ItemsSource="{Binding SearchResults}"
+                     SelectionMode="Single"
+                     Background="Transparent"
+                     Padding="0">
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <Border Padding="12,8" 
+                                Margin="0,0,0,4"
+                                Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                                CornerRadius="8"
+                                BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                                BorderThickness="1">
+                            <Panel>
+                                <StackPanel Spacing="4" Orientation="Vertical">
+                                    <!-- 标题行 -->
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <TextBlock Text="{Binding Title}" 
+                                                   FontSize="16" FontWeight="SemiBold"/>
+                                        <TextBlock Text="{Binding Author}" 
+                                                   FontSize="12" 
+                                                   VerticalAlignment="Center"
+                                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                                    </StackPanel>
+                                    <!-- 描述 -->
+                                    <TextBlock Text="{Binding Description}" 
+                                               FontSize="13"
+                                               TextTrimming="CharacterEllipsis"
+                                               MaxLines="2"
+                                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                                    <!-- 底部信息行 -->
+                                    <StackPanel Orientation="Horizontal" Spacing="16">
+                                        <TextBlock FontSize="12" 
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}">
+                                            <TextBlock.Text>
+                                                <MultiBinding StringFormat="下载量: {0:N0}">
+                                                    <Binding Path="Downloads"/>
+                                                </MultiBinding>
+                                            </TextBlock.Text>
+                                        </TextBlock>
+                                        <TextBlock FontSize="12"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}">
+                                            <TextBlock.Text>
+                                                <MultiBinding StringFormat="关注: {0:N0}">
+                                                    <Binding Path="Follows"/>
+                                                </MultiBinding>
+                                            </TextBlock.Text>
+                                        </TextBlock>
+                                    </StackPanel>
+                                </StackPanel>
+                                <!-- 整行透明按钮覆盖，用于点击事件 -->
+                                <Button Classes="w-full h-full" 
+                                        Background="Transparent" 
+                                        BorderThickness="0"
+                                        Command="{Binding $parent[ListBox].((vm:ModSearchViewModel)DataContext).SelectModCommand}"
+                                        CommandParameter="{Binding}"/>
+                            </Panel>
+                        </Border>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+        </ScrollViewer>
+    </DockPanel>
+</UserControl>

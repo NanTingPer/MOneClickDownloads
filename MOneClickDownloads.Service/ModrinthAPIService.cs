@@ -2,6 +2,7 @@ using System.Text.Json;
 using MOneClickDownloads.DataModel.Project;
 using MOneClickDownloads.DataModel.Search;
 using MOneClickDownloads.DataModel.Version;
+using Serilog;
 
 namespace MOneClickDownloads.Service
 {
@@ -21,7 +22,7 @@ namespace MOneClickDownloads.Service
     /// <br />
     /// 使用示例：<br />
     /// <code>
-    /// // 外部传入模式（推荐用于ASP.NET Core等DI环境）
+    /// // 外部传入模式（推荐用于ASP.NET Core等DI场景）
     /// using var apiService = new ModrinthAPIService(httpClient);
     /// 
     /// // 自维护模式（适用于控制台应用或独立服务）
@@ -35,6 +36,7 @@ namespace MOneClickDownloads.Service
 
         private readonly HttpClient _httpClient;
         private readonly bool _ownsHttpClient;
+        private readonly ILogger _logger;
         private bool _disposed = false;
 
         /// <summary>
@@ -54,7 +56,9 @@ namespace MOneClickDownloads.Service
         {
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _ownsHttpClient = false;
+            _logger = Log.ForContext<ModrinthAPIService>();
             ConfigureHttpClient(_httpClient);
+            _logger.Information("ModrinthAPIService 已初始化（外部 HttpClient 模式）");
         }
 
         /// <summary>
@@ -80,7 +84,9 @@ namespace MOneClickDownloads.Service
             };
             _httpClient = new HttpClient(handler);
             _ownsHttpClient = true;
+            _logger = Log.ForContext<ModrinthAPIService>();
             ConfigureHttpClient(_httpClient);
+            _logger.Information("ModrinthAPIService 已初始化（自维护 HttpClient 模式）");
         }
 
         /// <summary>
@@ -114,11 +120,15 @@ namespace MOneClickDownloads.Service
         /// <exception cref="JsonException">JSON解析失败时抛出</exception>
         public async Task<Project> GetProjectAsync(string idOrSlug)
         {
-            var response = await _httpClient.GetAsync($"{BaseUrl}/project/{idOrSlug}");
+            _logger.Debug("获取项目详情: {IdOrSlug}", idOrSlug);
+            var url = $"{BaseUrl}/project/{idOrSlug}";
+            var response = await _httpClient.GetAsync(url);
             response.EnsureSuccessStatusCode();
             var content = await response.Content.ReadAsStringAsync();
-            return JsonSerializer.Deserialize<Project>(content) 
+            var project = JsonSerializer.Deserialize<Project>(content)
                 ?? throw new JsonException("无法反序列化Project对象");
+            _logger.Information("获取项目详情成功: {IdOrSlug}, Title={Title}", idOrSlug, project.Title);
+            return project;
         }
 
         /// <summary>
@@ -154,6 +164,9 @@ namespace MOneClickDownloads.Service
             int offset = 0, 
             int limit = 10)
         {
+            _logger.Debug("搜索项目: Query={Query}, GameVersions={GameVersions}, Loaders={Loaders}, Offset={Offset}, Limit={Limit}",
+                query, gameVersions, loaders, offset, limit);
+
             var queryParams = new List<string>
             {
                 $"query={Uri.EscapeDataString(query)}",
@@ -181,8 +194,10 @@ namespace MOneClickDownloads.Service
             var response = await _httpClient.GetAsync(url);
             response.EnsureSuccessStatusCode();
             var content = await response.Content.ReadAsStringAsync();
-            return JsonSerializer.Deserialize<SearchResponse>(content) 
+            var result = JsonSerializer.Deserialize<SearchResponse>(content)
                 ?? throw new JsonException("无法反序列化SearchResponse对象");
+            _logger.Information("搜索完成: Query={Query}, TotalHits={TotalHits}", query, result.TotalHits);
+            return result;
         }
 
         /// <summary>
@@ -216,6 +231,9 @@ namespace MOneClickDownloads.Service
             List<string>? gameVersions = null, 
             List<string>? loaders = null)
         {
+            _logger.Debug("获取项目版本: ProjectId={ProjectId}, GameVersions={GameVersions}, Loaders={Loaders}",
+                projectId, gameVersions, loaders);
+
             var queryParams = new List<string>();
             if (gameVersions != null && gameVersions.Count > 0)
             {
@@ -235,8 +253,10 @@ namespace MOneClickDownloads.Service
             var response = await _httpClient.GetAsync(url);
             response.EnsureSuccessStatusCode();
             var content = await response.Content.ReadAsStringAsync();
-            return JsonSerializer.Deserialize<List<ModrinthVersion>>(content) 
+            var versions = JsonSerializer.Deserialize<List<ModrinthVersion>>(content)
                 ?? new List<ModrinthVersion>();
+            _logger.Information("获取项目版本成功: ProjectId={ProjectId}, 版本数量={Count}", projectId, versions.Count);
+            return versions;
         }
 
         /// <summary>
@@ -260,11 +280,14 @@ namespace MOneClickDownloads.Service
         /// <exception cref="JsonException">JSON解析失败时抛出</exception>
         public async Task<ModrinthVersion> GetVersionAsync(string versionId)
         {
+            _logger.Debug("获取版本详情: VersionId={VersionId}", versionId);
             var response = await _httpClient.GetAsync($"{BaseUrl}/version/{versionId}");
             response.EnsureSuccessStatusCode();
             var content = await response.Content.ReadAsStringAsync();
-            return JsonSerializer.Deserialize<ModrinthVersion>(content) 
+            var version = JsonSerializer.Deserialize<ModrinthVersion>(content)
                 ?? throw new JsonException("无法反序列化ModrinthVersion对象");
+            _logger.Information("获取版本详情成功: VersionId={VersionId}, Name={Name}", versionId, version.Name);
+            return version;
         }
 
         /// <summary>
@@ -298,6 +321,8 @@ namespace MOneClickDownloads.Service
             IProgress<long>? progress = null, 
             CancellationToken cancellationToken = default)
         {
+            _logger.Debug("开始下载文件: Url={Url}, SavePath={SavePath}", url, savePath);
+
             // 确保目录存在
             var directory = Path.GetDirectoryName(savePath);
             if (!string.IsNullOrEmpty(directory))
@@ -330,6 +355,8 @@ namespace MOneClickDownloads.Service
                 totalBytesRead += bytesRead;
                 progress?.Report(totalBytesRead);
             }
+
+            _logger.Information("文件下载完成: SavePath={SavePath}, Size={Size} bytes", savePath, totalBytesRead);
         }
 
         /// <summary>
@@ -353,6 +380,7 @@ namespace MOneClickDownloads.Service
                 if (disposing && _ownsHttpClient)
                 {
                     _httpClient.Dispose();
+                    _logger.Information("ModrinthAPIService 已释放（自维护 HttpClient 已关闭）");
                 }
                 _disposed = true;
             }

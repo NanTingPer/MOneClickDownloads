@@ -1,4 +1,5 @@
 using MOneClickDownloads.DataModel.Search;
+using Serilog;
 
 namespace MOneClickDownloads.Service
 {
@@ -33,6 +34,7 @@ namespace MOneClickDownloads.Service
     public class ModSearchService
     {
         private readonly ModrinthAPIService _apiService;
+        private readonly ILogger _logger;
 
         /// <summary>
         /// 构造搜索服务。<br />
@@ -45,6 +47,8 @@ namespace MOneClickDownloads.Service
         public ModSearchService(ModrinthAPIService apiService)
         {
             _apiService = apiService ?? throw new ArgumentNullException(nameof(apiService));
+            _logger = Log.ForContext<ModSearchService>();
+            _logger.Information("ModSearchService 已初始化");
         }
 
         /// <summary>
@@ -70,6 +74,7 @@ namespace MOneClickDownloads.Service
         /// <returns>搜索响应对象</returns>
         public async Task<SearchResponse> SearchAsync(string query, int page = 1, int pageSize = 10)
         {
+            _logger.Debug("执行无过滤搜索: Query={Query}, Page={Page}, PageSize={PageSize}", query, page, pageSize);
             var offset = (page - 1) * pageSize;
             return await _apiService.SearchProjectsAsync(query, null, null, offset, pageSize);
         }
@@ -101,6 +106,8 @@ namespace MOneClickDownloads.Service
             int page = 1, 
             int pageSize = 10)
         {
+            _logger.Debug("执行带过滤搜索: Query={Query}, GameVersion={GameVersion}, Loader={Loader}, Page={Page}, PageSize={PageSize}",
+                query, gameVersion, loader, page, pageSize);
             var offset = (page - 1) * pageSize;
             var gameVersions = new List<string> { gameVersion };
             var loaders = new List<string> { loader };

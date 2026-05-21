@@ -1,6 +1,7 @@
 using MOneClickDownloads.DataModel.Enums;
 using MOneClickDownloads.DataModel.Version;
 using MOneClickDownloads.Service.Models;
+using Serilog;
 
 namespace MOneClickDownloads.Service
 {
@@ -46,6 +47,7 @@ namespace MOneClickDownloads.Service
         private static readonly TimeSpan RetryDelay = TimeSpan.FromSeconds(2);
 
         private readonly ModrinthAPIService _apiService;
+        private readonly ILogger _logger;
 
         /// <summary>
         /// 构造下载服务。<br />
@@ -62,6 +64,8 @@ namespace MOneClickDownloads.Service
         public ModDownloadService(ModrinthAPIService apiService)
         {
             _apiService = apiService ?? throw new ArgumentNullException(nameof(apiService));
+            _logger = Log.ForContext<ModDownloadService>();
+            _logger.Information("ModDownloadService 已初始化");
         }
 
         /// <summary>
@@ -106,6 +110,9 @@ namespace MOneClickDownloads.Service
             IProgress<DownloadProgress>? progress = null,
             CancellationToken cancellationToken = default)
         {
+            _logger.Information("开始推荐下载: ProjectId={ProjectId}, GameVersion={GameVersion}, Loader={Loader}, SaveDirectory={SaveDirectory}",
+                projectId, gameVersion, loader, saveDirectory);
+
             var gameVersions = new List<string> { gameVersion };
             var loaders = new List<string> { loader };
 
@@ -121,10 +128,14 @@ namespace MOneClickDownloads.Service
             // 若无 Release 版本，不推荐（返回空列表）
             if (releaseVersions.Count == 0)
             {
+                _logger.Warning("项目 {ProjectId} 没有兼容 {GameVersion} + {Loader} 的 Release 版本，跳过推荐下载",
+                    projectId, gameVersion, loader);
                 return new List<DownloadResult>();
             }
 
             var targetVersion = releaseVersions.First();
+            _logger.Information("选定推荐版本: {VersionName} (ID: {VersionId})", targetVersion.Name, targetVersion.Id);
+
             return await ExecuteDownloadTransactionAsync(
                 targetVersion, gameVersions, loaders, saveDirectory, true, progress, cancellationToken);
         }
@@ -169,6 +180,9 @@ namespace MOneClickDownloads.Service
             IProgress<DownloadProgress>? progress = null,
             CancellationToken cancellationToken = default)
         {
+            _logger.Information("开始指定版本下载: ProjectId={ProjectId}, GameVersion={GameVersion}, Loader={Loader}, VersionType={VersionType}",
+                projectId, gameVersion, loader, versionType);
+
             var gameVersions = new List<string> { gameVersion };
             var loaders = new List<string> { loader };
 
@@ -181,11 +195,15 @@ namespace MOneClickDownloads.Service
 
             if (filteredVersions.Count == 0)
             {
+                _logger.Error("项目 {ProjectId} 没有兼容 {GameVersion} + {Loader} 的 {VersionType} 版本",
+                    projectId, gameVersion, loader, versionType);
                 throw new InvalidOperationException(
                     $"项目 '{projectId}' 没有兼容 {gameVersion} + {loader} 的 {versionType} 版本");
             }
 
             var targetVersion = filteredVersions.First();
+            _logger.Information("选定版本: {VersionName} (ID: {VersionId})", targetVersion.Name, targetVersion.Id);
+
             return await ExecuteDownloadTransactionAsync(
                 targetVersion, gameVersions, loaders, saveDirectory, true, progress, cancellationToken);
         }
@@ -235,6 +253,9 @@ namespace MOneClickDownloads.Service
             IProgress<DownloadProgress>? progress = null,
             CancellationToken cancellationToken = default)
         {
+            _logger.Information("开始带依赖下载: ProjectId={ProjectId}, GameVersion={GameVersion}, Loader={Loader}, VersionType={VersionType}, SaveDirectory={SaveDirectory}",
+                projectId, gameVersion, loader, versionType, saveDirectory);
+
             var gameVersions = new List<string> { gameVersion };
             var loaders = new List<string> { loader };
 
@@ -247,11 +268,15 @@ namespace MOneClickDownloads.Service
 
             if (filteredVersions.Count == 0)
             {
+                _logger.Error("项目 {ProjectId} 没有兼容 {GameVersion} + {Loader} 的 {VersionType} 版本",
+                    projectId, gameVersion, loader, versionType);
                 throw new InvalidOperationException(
                     $"项目 '{projectId}' 没有兼容 {gameVersion} + {loader} 的 {versionType} 版本");
             }
 
             var targetVersion = filteredVersions.First();
+            _logger.Information("选定版本: {VersionName} (ID: {VersionId})", targetVersion.Name, targetVersion.Id);
+
             return await ExecuteDownloadTransactionAsync(
                 targetVersion, gameVersions, loaders, saveDirectory, true, progress, cancellationToken);
         }
@@ -303,6 +328,7 @@ namespace MOneClickDownloads.Service
                 var primaryFile = GetPrimaryFile(version);
                 if (primaryFile == null)
                 {
+                    _logger.Error("版本 {VersionName} (ID: {VersionId}) 没有可下载的文件", version.Name, version.Id);
                     throw new DownloadException($"版本 '{version.Name}' (ID: {version.Id}) 没有可下载的文件");
                 }
                 allFilesToDownload.Add((version, primaryFile, false));
@@ -318,12 +344,17 @@ namespace MOneClickDownloads.Service
                 var totalCount = allFilesToDownload.Count;
                 var completedCount = 0;
 
+                _logger.Information("共需下载 {TotalCount} 个文件（主模组 + 依赖）", totalCount);
+
                 // 逐个下载文件
                 foreach (var (ver, file, isDependency) in allFilesToDownload)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
                     var savePath = Path.Combine(saveDirectory, file.Filename);
+
+                    _logger.Information("开始下载文件 [{CompletedCount}/{TotalCount}]: {FileName} ({Type})",
+                        completedCount + 1, totalCount, file.Filename, isDependency ? "依赖" : "主模组");
 
                     // 报告进度：开始下载当前文件
                     progress?.Report(new DownloadProgress
@@ -362,16 +393,19 @@ namespace MOneClickDownloads.Service
                     });
                 }
 
+                _logger.Information("下载事务完成，共下载 {Count} 个文件", results.Count);
                 return results;
             }
             catch (OperationCanceledException)
             {
+                _logger.Warning("下载被取消，正在回滚 {Count} 个已下载文件", downloadedFiles.Count);
                 // 取消时回滚所有已下载文件
                 RollbackDownloadedFiles(downloadedFiles);
                 throw;
             }
             catch (Exception ex) when (ex is not DownloadException)
             {
+                _logger.Error(ex, "下载过程中发生错误，正在回滚 {Count} 个已下载文件", downloadedFiles.Count);
                 // 其他异常时回滚所有已下载文件
                 RollbackDownloadedFiles(downloadedFiles);
                 throw new DownloadException($"下载过程中发生错误: {ex.Message}", ex);
@@ -425,6 +459,7 @@ namespace MOneClickDownloads.Service
                 if (!string.IsNullOrEmpty(dependency.VersionId))
                 {
                     // 有具体版本ID → 直接获取该版本
+                    _logger.Debug("获取依赖版本详情: VersionId={VersionId}", dependency.VersionId);
                     depVersion = await _apiService.GetVersionAsync(dependency.VersionId);
                 }
                 else
@@ -433,14 +468,17 @@ namespace MOneClickDownloads.Service
                     // 若已下载过该项目 → 跳过（防循环依赖）
                     if (downloadedProjects.Contains(dependency.ProjectId!))
                     {
+                        _logger.Debug("跳过已下载的依赖项目: ProjectId={ProjectId}（防循环依赖）", dependency.ProjectId);
                         continue;
                     }
 
+                    _logger.Debug("查询依赖项目兼容版本: ProjectId={ProjectId}", dependency.ProjectId);
                     var depVersions = await _apiService.GetProjectVersionsAsync(
                         dependency.ProjectId!, gameVersions, loaders);
 
                     if (depVersions.Count == 0)
                     {
+                        _logger.Error("依赖项目 {ProjectId} 没有兼容版本", dependency.ProjectId);
                         throw new DownloadException(
                             $"依赖项目 '{dependency.ProjectId}' 没有兼容 {string.Join(",", gameVersions)} + {string.Join(",", loaders)} 的版本");
                     }
@@ -449,6 +487,9 @@ namespace MOneClickDownloads.Service
                     depVersion = SelectBestVersion(depVersions);
                 }
 
+                _logger.Information("收集到依赖: {DepName} (ProjectId: {DepProjectId}, VersionId: {DepVersionId})",
+                    depVersion.Name, depVersion.ProjectId, depVersion.Id);
+
                 // 标记该项目已处理
                 downloadedProjects.Add(depVersion.ProjectId);
 
@@ -456,6 +497,7 @@ namespace MOneClickDownloads.Service
                 var depFile = GetPrimaryFile(depVersion);
                 if (depFile == null)
                 {
+                    _logger.Error("依赖版本 {DepName} (ID: {DepId}) 没有可下载的文件", depVersion.Name, depVersion.Id);
                     throw new DownloadException(
                         $"依赖版本 '{depVersion.Name}' (ID: {depVersion.Id}) 没有可下载的文件");
                 }
@@ -569,6 +611,7 @@ namespace MOneClickDownloads.Service
                 catch (Exception ex)
                 {
                     lastException = ex;
+                    _logger.Warning(ex, "文件下载失败（第 {Attempt}/{MaxRetry} 次）: {Url}", attempt, MaxRetryCount, url);
 
                     // 清理可能的部分下载文件
                     TryDeleteFile(savePath);
@@ -580,6 +623,7 @@ namespace MOneClickDownloads.Service
                 }
             }
 
+            _logger.Error(lastException, "文件下载最终失败（已重试 {MaxRetry} 次）: {Url}", MaxRetryCount, url);
             throw new DownloadException(
                 $"下载文件失败（已重试 {MaxRetryCount} 次）: {url} - {lastException?.Message}", lastException);
         }
