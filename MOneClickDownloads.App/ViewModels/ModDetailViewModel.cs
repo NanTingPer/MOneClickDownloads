@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -51,6 +52,7 @@ namespace MOneClickDownloads.App.ViewModels
         private double _downloadProgressValue;
 
         private CancellationTokenSource? _downloadCts;
+        private bool _downloadCompleted;
 
         public ModDetailViewModel(MainWindowViewModel mainVm, string projectId, string projectTitle, string projectDescription)
         {
@@ -175,17 +177,18 @@ namespace MOneClickDownloads.App.ViewModels
             _logger.Information("用户选择保存目录: {SavePath}", savePath);
 
             IsDownloading = true;
+            _downloadCompleted = false;
             DownloadStatus = "准备下载...";
             DownloadProgressValue = 0;
             _downloadCts = new CancellationTokenSource();
 
             var progress = new Progress<DownloadProgress>(p =>
             {
-                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                if (!_downloadCompleted)
                 {
                     DownloadStatus = $"正在下载: {p.CurrentFileName} ({p.CompletedCount}/{p.TotalCount})";
                     DownloadProgressValue = p.Percentage;
-                });
+                }
             });
 
             try
@@ -197,6 +200,8 @@ namespace MOneClickDownloads.App.ViewModels
                 _logger.Information("开始下载任务: GameVersion={GameVersion}, Loader={Loader}, VersionType={VersionType}",
                     gameVersion, loader, versionType);
 
+                var stopwatch = Stopwatch.StartNew();
+
                 var results = await _downloadService.DownloadWithDependenciesAsync(
                     item.Version.ProjectId,
                     gameVersion,
@@ -207,8 +212,11 @@ namespace MOneClickDownloads.App.ViewModels
                     _downloadCts.Token
                 );
 
-                DownloadStatus = $"下载完成! 共 {results.Count} 个文件。";
-                _logger.Information("下载任务完成: 共 {Count} 个文件", results.Count);
+                stopwatch.Stop();
+                _downloadCompleted = true;
+                DownloadProgressValue = 100;
+                DownloadStatus = $"下载完成，用时 {stopwatch.Elapsed.TotalSeconds:F1} 秒，共 {results.Count} 个文件";
+                _logger.Information("下载任务完成: 共 {Count} 个文件，耗时 {Elapsed} 秒", results.Count, stopwatch.Elapsed.TotalSeconds);
             }
             catch (OperationCanceledException)
             {
