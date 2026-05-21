@@ -1,3 +1,5 @@
 <Solution>
   <Project Path="MOneClickDownloads.App/MOneClickDownloads.App.csproj" />
+  <Project Path="MOneClickDownloads.DataModel/MOneClickDownloads.DataModel.csproj" Id="b7ca33cc-df4a-4598-ab6f-6086b0588eaa" />
+  <Project Path="MOneClickDownloads.Test/MOneClickDownloads.Test.csproj" Id="9d4bbd39-b51c-4cb5-851a-71b0455c4502" />
 </Solution>
