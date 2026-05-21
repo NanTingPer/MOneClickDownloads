@@ -91,7 +91,7 @@
                                 <Button Classes="w-full h-full" 
                                         Background="Transparent" 
                                         BorderThickness="0"
-                                        Command="{Binding $parent[ListBox].((vm:ModSearchViewModel)DataContext).SelectModCommand}"
+                                        Command="{Binding $parent[ListBox].DataContext.SelectModCommand}"
                                         CommandParameter="{Binding}"/>
                             </Panel>
                         </Border>
