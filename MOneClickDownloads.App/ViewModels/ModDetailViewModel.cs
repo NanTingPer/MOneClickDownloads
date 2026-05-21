@@ -43,6 +43,14 @@ namespace MOneClickDownloads.App.ViewModels
         private ObservableCollection<McVersionGroup> _versionGroups = new();
 
         [ObservableProperty]
+        private ObservableCollection<string> _availableLoaders = new();
+
+        [ObservableProperty]
+        private string? _activeLoaderFilter;
+
+        private List<McVersionGroup> _allVersionGroups = new();
+
+        [ObservableProperty]
         private bool _isDownloading;
 
         [ObservableProperty]
@@ -139,13 +147,74 @@ namespace MOneClickDownloads.App.ViewModels
                 })
                 .ToList();
 
-            VersionGroups.Clear();
-            foreach (var group in sortedGroups)
+            _allVersionGroups = sortedGroups;
+
+            // 提取所有不重复的加载器
+            var loaders = versions
+                .SelectMany(v => v.Loaders)
+                .Distinct()
+                .OrderBy(l => l)
+                .ToList();
+            AvailableLoaders.Clear();
+            foreach (var loader in loaders)
             {
-                VersionGroups.Add(group);
+                AvailableLoaders.Add(loader);
             }
 
-            _logger.Debug("版本分组完成: 共 {GroupCount} 个大版本组", sortedGroups.Count);
+            ActiveLoaderFilter = null;
+            ApplyLoaderFilter();
+
+            _logger.Debug("版本分组完成: 共 {GroupCount} 个大版本组，可用加载器: {Loaders}", sortedGroups.Count, string.Join(", ", loaders));
+        }
+
+        [RelayCommand]
+        private void ToggleLoaderFilter(string? loader)
+        {
+            if (string.IsNullOrEmpty(loader))
+            {
+                ActiveLoaderFilter = null;
+            }
+            else if (ActiveLoaderFilter == loader)
+            {
+                ActiveLoaderFilter = null;
+            }
+            else
+            {
+                ActiveLoaderFilter = loader;
+            }
+            ApplyLoaderFilter();
+            _logger.Information("加载器过滤切换: ActiveFilter={Filter}", ActiveLoaderFilter ?? "(无)");
+        }
+
+        private void ApplyLoaderFilter()
+        {
+            VersionGroups.Clear();
+
+            var source = _allVersionGroups;
+            if (!string.IsNullOrEmpty(ActiveLoaderFilter))
+            {
+                foreach (var group in source)
+                {
+                    var filtered = group.Versions
+                        .Where(v => v.Version.Loaders.Contains(ActiveLoaderFilter, StringComparer.OrdinalIgnoreCase))
+                        .ToList();
+                    if (filtered.Count > 0)
+                    {
+                        VersionGroups.Add(new McVersionGroup
+                        {
+                            MajorVersion = group.MajorVersion,
+                            Versions = filtered
+                        });
+                    }
+                }
+            }
+            else
+            {
+                foreach (var group in source)
+                {
+                    VersionGroups.Add(group);
+                }
+            }
         }
 
         [RelayCommand]

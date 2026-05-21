@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:MOneClickDownloads.App.ViewModels"
              xmlns:m="using:MOneClickDownloads.App.Models"
+             xmlns:conv="using:MOneClickDownloads.App.Converters"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="550"
@@ -54,6 +55,47 @@
             <TextBlock Text="{Binding DownloadStatus}" 
                        FontSize="13"
                        Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+        </Border>
+
+        <!-- 加载器过滤标签栏 -->
+        <Border DockPanel.Dock="Top" Padding="16,4"
+                IsVisible="{Binding !IsLoading}">
+            <ItemsControl ItemsSource="{Binding AvailableLoaders}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <StackPanel Orientation="Horizontal" Spacing="6"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="x:String">
+                        <Button Command="{Binding #VersionList.DataContext.ToggleLoaderFilterCommand}"
+                                CommandParameter="{Binding}"
+                                Padding="10,4"
+                                Cursor="Hand">
+                            <Button.Template>
+                                <ControlTemplate>
+                                    <Border CornerRadius="20"
+                                            Padding="{TemplateBinding Padding}"
+                                            BorderThickness="1"
+                                            BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
+                                            Cursor="Hand">
+                                        <Border.Background>
+                                            <MultiBinding Converter="{x:Static conv:StringEqualsConverter.Instance}">
+                                                <Binding/>
+                                                <Binding Path="#VersionList.DataContext.ActiveLoaderFilter"
+                                                         RelativeSource="{RelativeSource AncestorType=ItemsControl}"/>
+                                            </MultiBinding>
+                                        </Border.Background>
+                                        <TextBlock Text="{Binding}"
+                                                   FontSize="13"
+                                                   VerticalAlignment="Center"/>
+                                    </Border>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
         </Border>
 
         <!-- 中部：版本分组列表 -->
@@ -131,7 +173,7 @@
                                                             BorderThickness="0"
                                                             HorizontalAlignment="Stretch"
                                                             VerticalAlignment="Stretch"
-                                                             Command="{Binding #VersionList.DataContext.DownloadVersionCommand}"
+                                                            Command="{Binding #VersionList.DataContext.DownloadVersionCommand}"
                                                             CommandParameter="{Binding}"/>
                                                 </Panel>
                                             </Border>

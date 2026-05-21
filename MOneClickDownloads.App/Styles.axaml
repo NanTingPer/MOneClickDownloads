@@ -64,4 +64,38 @@
     <Style Selector="Border.bg-primary">
         <Setter Property="Background" Value="{DynamicResource SystemAccentColor}"/>
     </Style>
+    <Style Selector="Border.bg-subtle">
+        <Setter Property="Background" Value="{DynamicResource ControlFillColorDefaultBrush}"/>
+    </Style>
+    <Style Selector="Border.bg-accent">
+        <Setter Property="Background" Value="{DynamicResource SystemAccentColor}"/>
+    </Style>
+
+    <!-- Cursor -->
+    <Style Selector="Control.cursor-pointer">
+        <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+
+    <!-- Border Radius -->
+    <Style Selector="Border.rounded-full">
+        <Setter Property="CornerRadius" Value="20"/>
+    </Style>
+    <Style Selector="Border.rounded-md">
+        <Setter Property="CornerRadius" Value="6"/>
+    </Style>
+
+    <!-- Spacing -->
+    <Style Selector="StackPanel.gap-1">
+        <Setter Property="Spacing" Value="4"/>
+    </Style>
+    <Style Selector="StackPanel.gap-2">
+        <Setter Property="Spacing" Value="8"/>
+    </Style>
+    <Style Selector="StackPanel.gap-4">
+        <Setter Property="Spacing" Value="16"/>
+    </Style>
+    <!-- Display -->
+    <Style Selector="Border.inline-block">
+        <Setter Property="HorizontalAlignment" Value="Left"/>
+    </Style>
 </Styles>
