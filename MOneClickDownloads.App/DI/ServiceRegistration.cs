@@ -48,6 +48,13 @@ namespace MOneClickDownloads.App.DI
                 return new ConfigService(configPath);
             });
 
+            // 收藏夹（合集）服务 - JSON 文件持久化，存储目录为 logs 同级的 package 目录
+            services.AddSingleton<IFavoriteService>(sp =>
+            {
+                var packagePath = Path.Combine(AppContext.BaseDirectory, "package");
+                return new FavoriteService(packagePath);
+            });
+
             // ===== ViewModel 层 =====
 
             // MainWindowViewModel - Singleton（应用主 VM，管理导航状态）

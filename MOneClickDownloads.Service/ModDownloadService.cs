@@ -413,6 +413,11 @@ namespace MOneClickDownloads.Service
                                         _logger.Information("用户选择替换（预检阶段），删除旧文件: {OldPath}", preCheckConflict.ExistingFilePath);
                                         File.Delete(preCheckConflict.ExistingFilePath);
                                     }
+                                    // 同步更新清单，避免第二级检测（DetectByModId）因快照中仍有旧条目而重复弹出冲突对话框
+                                    if (preCheckConflict.ModId != null)
+                                    {
+                                        inventory.RemoveMod(preCheckConflict.ModId);
+                                    }
                                     // 继续下载（不 break）
                                     break;
 

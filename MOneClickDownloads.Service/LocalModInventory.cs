@@ -216,5 +216,24 @@ namespace MOneClickDownloads.Service
         {
             return !string.IsNullOrEmpty(modId) && _modIndex.ContainsKey(modId);
         }
+
+        /// <summary>
+        /// 从清单中移除指定模组条目。<br />
+        /// <br />
+        /// 使用场景：<br />
+        /// - 预检冲突阶段用户选择 Replace 并删除旧文件后，同步移除清单中的旧条目，<br />
+        ///   避免后续第二级冲突检测（DetectByModId）因快照中仍有旧条目而重复弹出冲突对话框。<br />
+        /// <br />
+        /// 注意：此方法仅更新内存中的索引，不删除磁盘上的文件。
+        /// </summary>
+        /// <param name="modId">要移除的模组 ID</param>
+        public void RemoveMod(string modId)
+        {
+            if (string.IsNullOrEmpty(modId)) return;
+
+            _modIndex.Remove(modId);
+            _filePathIndex.Remove(modId);
+            _logger.Debug("已从清单移除模组: {ModId}", modId);
+        }
     }
 }
