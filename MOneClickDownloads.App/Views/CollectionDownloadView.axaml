@@ -1,0 +1,258 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:MOneClickDownloads.App.ViewModels"
+             xmlns:m="using:MOneClickDownloads.App.Models"
+             xmlns:conv="using:MOneClickDownloads.App.Converters"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="550"
+             x:Class="MOneClickDownloads.App.Views.CollectionDownloadView"
+             x:DataType="vm:CollectionDownloadViewModel">
+
+    <DockPanel>
+        <!-- 顶部：返回按钮 + 合集信息 -->
+        <Border DockPanel.Dock="Top" Padding="16,12">
+            <StackPanel Spacing="8">
+                <!-- 返回按钮 -->
+                <Button Content="← 返回收藏夹" 
+                        Command="{Binding GoBackCommand}"
+                        HorizontalAlignment="Left"
+                        Padding="8,4"/>
+                
+                <!-- 合集标题 -->
+                <TextBlock FontSize="22" FontWeight="Bold">
+                    <TextBlock.Text>
+                        <MultiBinding StringFormat="合集下载: {0}">
+                            <Binding Path="CollectionName"/>
+                        </MultiBinding>
+                    </TextBlock.Text>
+                </TextBlock>
+                
+                <!-- 保存目录 -->
+                <TextBlock FontSize="13"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}">
+                    <TextBlock.Text>
+                        <MultiBinding StringFormat="保存到: {0}">
+                            <Binding Path="SaveDirectory"/>
+                        </MultiBinding>
+                    </TextBlock.Text>
+                </TextBlock>
+
+                <!-- 模组数量 -->
+                <TextBlock FontSize="13"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}">
+                    <TextBlock.Text>
+                        <MultiBinding StringFormat="共 {0} 个模组">
+                            <Binding Path="FavoriteItems.Count"/>
+                        </MultiBinding>
+                    </TextBlock.Text>
+                </TextBlock>
+            </StackPanel>
+        </Border>
+
+        <!-- 底部：下载状态栏 -->
+        <Border DockPanel.Dock="Bottom" Padding="16,12"
+                IsVisible="{Binding IsDownloading}">
+            <StackPanel Spacing="8">
+                <ProgressBar Value="{Binding DownloadProgressValue}" 
+                             Maximum="100" Height="8"/>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <TextBlock Text="{Binding DownloadStatus}" 
+                               FontSize="14"
+                               VerticalAlignment="Center"
+                               TextTrimming="CharacterEllipsis"/>
+                    <Button Content="取消下载" 
+                            Command="{Binding CancelDownloadCommand}"
+                            Padding="12,6" FontSize="14"/>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- 非下载时的底部状态文本 + 开始下载按钮 -->
+        <Border DockPanel.Dock="Bottom" Padding="16,12"
+                IsVisible="{Binding !IsDownloading}">
+            <DockPanel>
+                <Button Content="开始下载" 
+                        Command="{Binding StartDownloadCommand}"
+                        DockPanel.Dock="Right"
+                        Padding="20,8" FontSize="14"
+                        IsVisible="{Binding !IsLoading}"/>
+                <TextBlock Text="{Binding StatusMessage}" 
+                           FontSize="14"
+                           VerticalAlignment="Center"
+                           Margin="0,0,12,0"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+            </DockPanel>
+        </Border>
+
+        <!-- 筛选标签区域 -->
+        <Border DockPanel.Dock="Top" Padding="16,8"
+                IsVisible="{Binding !IsLoading}">
+            <StackPanel Spacing="6">
+                <!-- 加载器过滤标签栏 -->
+                <ItemsControl ItemsSource="{Binding AvailableLoaders}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal" Spacing="8"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="x:String">
+                            <Button Command="{Binding #CollectionDownloadList.DataContext.ToggleLoaderFilterCommand}"
+                                    CommandParameter="{Binding}"
+                                    Padding="14,6"
+                                    Cursor="Hand">
+                                <Button.Template>
+                                    <ControlTemplate>
+                                        <Border CornerRadius="20"
+                                                Padding="{TemplateBinding Padding}"
+                                                BorderThickness="1"
+                                                BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
+                                                Cursor="Hand">
+                                            <Border.Background>
+                                                <MultiBinding Converter="{x:Static conv:StringEqualsConverter.Instance}">
+                                                    <Binding/>
+                                                    <Binding Path="#CollectionDownloadList.DataContext.ActiveLoaderFilter"
+                                                             RelativeSource="{RelativeSource AncestorType=ItemsControl}"/>
+                                                </MultiBinding>
+                                            </Border.Background>
+                                            <TextBlock Text="{Binding}"
+                                                       FontSize="15"
+                                                       VerticalAlignment="Center"/>
+                                        </Border>
+                                    </ControlTemplate>
+                                </Button.Template>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <!-- MC版本过滤：可展开列表 -->
+                <StackPanel>
+                    <ToggleButton x:Name="McVersionToggle"
+                                  Padding="12,6"
+                                  HorizontalAlignment="Left"
+                                  IsChecked="True"
+                                  Background="Transparent"
+                                  Cursor="Hand">
+                        <StackPanel Orientation="Horizontal" Spacing="4">
+                            <TextBlock Text="MC版本"
+                                       FontSize="14"
+                                       FontWeight="SemiBold"
+                                       VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding #McVersionToggle.IsChecked, 
+                                       Converter={x:Static conv:BoolToArrowConverter.Instance}}"
+                                       FontSize="12"
+                                       VerticalAlignment="Center"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                        </StackPanel>
+                    </ToggleButton>
+                    <ScrollViewer MaxHeight="200"
+                                  IsVisible="{Binding #McVersionToggle.IsChecked}"
+                                  Margin="0,6,0,0">
+                        <ItemsControl ItemsSource="{Binding AvailableMcVersions}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="x:String">
+                                    <Button Command="{Binding #CollectionDownloadList.DataContext.ToggleMcVersionFilterCommand}"
+                                            CommandParameter="{Binding}"
+                                            Padding="14,6"
+                                            Classes="mr-2 mb-2"
+                                            Cursor="Hand">
+                                        <Button.Template>
+                                            <ControlTemplate>
+                                                <Border CornerRadius="20"
+                                                        Padding="{TemplateBinding Padding}"
+                                                        Margin="{TemplateBinding Margin}"
+                                                        BorderThickness="1"
+                                                        BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
+                                                        Cursor="Hand">
+                                                    <Border.Background>
+                                                        <MultiBinding Converter="{x:Static conv:StringEqualsConverter.Instance}">
+                                                            <Binding/>
+                                                            <Binding Path="#CollectionDownloadList.DataContext.ActiveMcVersionFilter"
+                                                                     RelativeSource="{RelativeSource AncestorType=ItemsControl}"/>
+                                                        </MultiBinding>
+                                                    </Border.Background>
+                                                    <TextBlock Text="{Binding}"
+                                                               FontSize="14"
+                                                               VerticalAlignment="Center"/>
+                                                </Border>
+                                            </ControlTemplate>
+                                        </Button.Template>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- 中部：模组兼容性状态列表 -->
+        <Panel>
+            <!-- 加载中 -->
+            <StackPanel IsVisible="{Binding IsLoading}" 
+                        HorizontalAlignment="Center" 
+                        VerticalAlignment="Center"
+                        Spacing="8">
+                <ProgressBar IsIndeterminate="True" Width="200" Height="4"/>
+                <TextBlock Text="正在加载模组版本信息..." 
+                           FontSize="14"
+                           HorizontalAlignment="Center"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+            </StackPanel>
+
+            <!-- 兼容性状态列表 -->
+            <ScrollViewer IsVisible="{Binding !IsLoading}" Padding="16,0">
+                <ItemsControl x:Name="CollectionDownloadList" ItemsSource="{Binding ModStatusList}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="m:CollectionModStatus">
+                            <Border Padding="12,10"
+                                    Margin="0,0,0,4"
+                                    Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                                    CornerRadius="8"
+                                    BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                                    BorderThickness="1">
+                                <Grid ColumnDefinitions="Auto,*">
+                                    <!-- 左侧：状态标识 -->
+                                    <Border Grid.Column="0"
+                                            CornerRadius="4"
+                                            Padding="6,2"
+                                            Margin="0,0,8,0">
+                                        <Border.Background>
+                                            <Binding Path="Status" 
+                                                     Converter="{x:Static conv:CompatibilityStatusBrushConverter.Instance}"/>
+                                        </Border.Background>
+                                        <TextBlock FontSize="13"
+                                                   FontWeight="SemiBold"
+                                                   VerticalAlignment="Center">
+                                            <TextBlock.Text>
+                                                <Binding Path="Status" 
+                                                         Converter="{x:Static conv:CompatibilityStatusTextConverter.Instance}"/>
+                                            </TextBlock.Text>
+                                        </TextBlock>
+                                    </Border>
+                                    <!-- 右侧：模组信息 -->
+                                    <StackPanel Grid.Column="1" Spacing="2">
+                                        <TextBlock Text="{Binding ModName}" 
+                                                   FontSize="15"
+                                                   FontWeight="SemiBold"
+                                                   VerticalAlignment="Center"/>
+                                        <TextBlock Text="{Binding StatusText}" 
+                                                   FontSize="13"
+                                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </Panel>
+    </DockPanel>
+</UserControl>

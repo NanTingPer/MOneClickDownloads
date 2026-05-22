@@ -1,6 +1,7 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MOneClickDownloads.App.DI;
+using MOneClickDownloads.DataModel.Favorites;
 using Serilog;
 
 namespace MOneClickDownloads.App.ViewModels
@@ -88,6 +89,17 @@ namespace MOneClickDownloads.App.ViewModels
         {
             Logger.Information("导航到模组详情页面: ProjectId={ProjectId}, Title={Title}, Slug={Slug}", projectId, projectTitle, projectSlug ?? "null");
             CurrentViewModel = _navigation.CreateDetailViewModel(projectId, projectTitle, projectDescription, projectSlug);
+        }
+
+        /// <summary>
+        /// 导航到合集下载页面
+        /// </summary>
+        /// <param name="collection">要下载的收藏合集</param>
+        /// <param name="saveDirectory">保存目录</param>
+        public void NavigateToCollectionDownload(FavoriteCollection collection, string saveDirectory)
+        {
+            Logger.Information("导航到合集下载页面: CollectionName={Name}, SavePath={Path}", collection.Name, saveDirectory);
+            CurrentViewModel = _navigation.CreateCollectionDownloadViewModel(collection, saveDirectory);
         }
     }
 }

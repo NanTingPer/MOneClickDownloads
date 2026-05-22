@@ -1,6 +1,7 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
 using MOneClickDownloads.App.ViewModels;
+using MOneClickDownloads.DataModel.Favorites;
 
 namespace MOneClickDownloads.App.DI
 {
@@ -64,6 +65,19 @@ namespace MOneClickDownloads.App.DI
         public FavoritesViewModel CreateFavoritesViewModel()
         {
             return _serviceProvider.GetRequiredService<FavoritesViewModel>();
+        }
+
+        /// <summary>
+        /// 创建合集下载页面 ViewModel。
+        /// 使用 ActivatorUtilities.CreateInstance 处理需要运行时参数（collection, saveDirectory）的创建。
+        /// </summary>
+        /// <param name="collection">要下载的收藏合集</param>
+        /// <param name="saveDirectory">保存目录</param>
+        /// <returns>合集下载页面 ViewModel</returns>
+        public CollectionDownloadViewModel CreateCollectionDownloadViewModel(FavoriteCollection collection, string saveDirectory)
+        {
+            return ActivatorUtilities.CreateInstance<CollectionDownloadViewModel>(
+                _serviceProvider, collection, saveDirectory);
         }
     }
 }

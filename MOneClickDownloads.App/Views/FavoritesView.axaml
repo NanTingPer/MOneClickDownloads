@@ -75,6 +75,13 @@
                                              Background="Transparent"
                                              BorderThickness="0,0,0,1"
                                              BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}">
+                                    <ToggleButton.ContextMenu>
+                                        <ContextMenu>
+                                            <MenuItem Header="下载此合集"
+                                                      Command="{Binding #FavoriteList.DataContext.DownloadCollectionCommand}"
+                                                      CommandParameter="{Binding}"/>
+                                        </ContextMenu>
+                                    </ToggleButton.ContextMenu>
                                     <DockPanel>
                                         <TextBlock FontSize="16" FontWeight="SemiBold"
                                                    DockPanel.Dock="Left">

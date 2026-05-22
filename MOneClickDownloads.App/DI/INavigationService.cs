@@ -1,3 +1,4 @@
+using MOneClickDownloads.DataModel.Favorites;
 using MOneClickDownloads.App.ViewModels;
 
 namespace MOneClickDownloads.App.DI
@@ -41,5 +42,13 @@ namespace MOneClickDownloads.App.DI
         /// </summary>
         /// <returns>收藏夹列表页面 ViewModel</returns>
         FavoritesViewModel CreateFavoritesViewModel();
+
+        /// <summary>
+        /// 创建合集下载页面 ViewModel。
+        /// </summary>
+        /// <param name="collection">要下载的收藏合集</param>
+        /// <param name="saveDirectory">保存目录</param>
+        /// <returns>合集下载页面 ViewModel</returns>
+        CollectionDownloadViewModel CreateCollectionDownloadViewModel(FavoriteCollection collection, string saveDirectory);
     }
 }

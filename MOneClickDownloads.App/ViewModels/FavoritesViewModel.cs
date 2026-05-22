@@ -1,6 +1,11 @@
 using System;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Threading.Tasks;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Platform.Storage;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MOneClickDownloads.App.DI;
@@ -172,6 +177,47 @@ namespace MOneClickDownloads.App.ViewModels
                 Logger.Information("已从合集 {CollectionId} 移除模组 {ProjectId}", collectionId, item.Item.ProjectId);
             }
             // Changed 事件会自动触发 LoadCollections
+        }
+
+        /// <summary>
+        /// 下载合集：弹出文件夹选择对话框后导航到合集下载页
+        /// </summary>
+        [RelayCommand]
+        private async Task DownloadCollectionAsync(FavoriteGroup? group)
+        {
+            if (group == null) return;
+
+            Logger.Information("用户请求下载合集: CollectionName={Name}, CollectionId={Id}", group.CollectionName, group.CollectionId);
+
+            // 获取主窗口作为 TopLevel
+            var topLevel = Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop
+                ? desktop.MainWindow
+                : null;
+
+            if (topLevel == null) return;
+
+            // 打开文件夹选择对话框
+            var folderPath = await topLevel.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+            {
+                Title = "选择合集下载位置",
+                AllowMultiple = false
+            });
+
+            if (folderPath.Count == 0) return;
+
+            var savePath = folderPath[0].Path.LocalPath;
+            Logger.Information("用户选择保存目录: {SavePath}", savePath);
+
+            // 获取原始 FavoriteCollection 对象
+            var collection = _favoriteService.GetCollection(group.CollectionId);
+            if (collection == null)
+            {
+                Logger.Error("找不到合集: CollectionId={Id}", group.CollectionId);
+                return;
+            }
+
+            // 导航到合集下载页
+            _navigation.MainViewModel.NavigateToCollectionDownload(collection, savePath);
         }
     }
 }

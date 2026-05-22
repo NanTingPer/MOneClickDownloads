@@ -1,0 +1,61 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="520" d:DesignHeight="420"
+        x:Class="MOneClickDownloads.App.Views.CollectionWarningDialog"
+        Title="兼容性警告"
+        Width="520" Height="420"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False">
+
+    <DockPanel Margin="20,16">
+        <!-- 底部按钮区 -->
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" 
+                    Spacing="8" HorizontalAlignment="Right" Margin="0,16,0,0">
+            <Button Content="取消" Padding="20,8" FontSize="14"
+                    x:Name="CancelButton"/>
+            <Button Content="继续下载" Padding="20,8" FontSize="14"
+                    x:Name="ContinueButton"/>
+        </StackPanel>
+
+        <!-- 内容区 -->
+        <StackPanel Spacing="12" VerticalAlignment="Top">
+            <!-- 警告标题 -->
+            <TextBlock x:Name="WarningTitle" FontSize="18" FontWeight="Bold"
+                       TextWrapping="Wrap"/>
+
+            <!-- 警告描述 -->
+            <TextBlock x:Name="WarningDescription" FontSize="14"
+                       TextWrapping="Wrap"
+                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+
+            <!-- 分隔线 -->
+            <Border Height="1" Background="{DynamicResource CardStrokeColorDefaultBrush}"
+                    Margin="0,4"/>
+
+            <!-- 不兼容模组列表 -->
+            <ScrollViewer MaxHeight="240">
+                <ItemsControl x:Name="ModList">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Padding="10,8" Margin="0,0,0,4"
+                                    Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                                    CornerRadius="6"
+                                    BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                                    BorderThickness="1">
+                                <StackPanel Spacing="2">
+                                    <TextBlock Text="{Binding ModName}" 
+                                               FontSize="14" FontWeight="SemiBold"/>
+                                    <TextBlock Text="{Binding StatusText}" 
+                                               FontSize="12"
+                                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </StackPanel>
+    </DockPanel>
+</Window>
