@@ -35,5 +35,11 @@ namespace MOneClickDownloads.App.DI
         /// <param name="projectSlug">项目 slug</param>
         /// <returns>详情页面 ViewModel</returns>
         ModDetailViewModel CreateDetailViewModel(string projectId, string projectTitle, string projectDescription, string? projectSlug = null);
+
+        /// <summary>
+        /// 创建收藏夹列表页面 ViewModel。
+        /// </summary>
+        /// <returns>收藏夹列表页面 ViewModel</returns>
+        FavoritesViewModel CreateFavoritesViewModel();
     }
 }

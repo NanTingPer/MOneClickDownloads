@@ -63,6 +63,9 @@ namespace MOneClickDownloads.App.DI
             // ModSearchViewModel - Transient（每次导航到搜索页时创建新实例）
             services.AddTransient<ModSearchViewModel>();
 
+            // FavoritesViewModel - Transient（每次导航到收藏夹页面时创建新实例）
+            services.AddTransient<FavoritesViewModel>();
+
             // ModDetailViewModel 通过 ActivatorUtilities.CreateInstance 创建（需要运行时参数）
 
             return services;

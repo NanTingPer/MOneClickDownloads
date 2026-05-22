@@ -1,0 +1,153 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:MOneClickDownloads.App.ViewModels"
+             xmlns:m="using:MOneClickDownloads.App.Models"
+             xmlns:conv="using:MOneClickDownloads.App.Converters"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="550"
+             x:Class="MOneClickDownloads.App.Views.FavoritesView"
+             x:DataType="vm:FavoritesViewModel">
+
+    <DockPanel>
+        <!-- 顶部：返回按钮 + 标题 -->
+        <Border DockPanel.Dock="Top" Padding="16,12">
+            <StackPanel Spacing="8">
+                <!-- 返回按钮 -->
+                <Button Content="← 返回搜索" 
+                        Command="{Binding GoBackCommand}"
+                        HorizontalAlignment="Left"
+                        Padding="8,4"/>
+                
+                <!-- 标题 -->
+                <TextBlock Text="我的收藏夹" 
+                           FontSize="22" FontWeight="Bold"/>
+            </StackPanel>
+        </Border>
+
+        <!-- 中部：收藏列表 -->
+        <Panel>
+            <!-- 加载中 -->
+            <StackPanel IsVisible="{Binding IsLoading}" 
+                        HorizontalAlignment="Center" 
+                        VerticalAlignment="Center"
+                        Spacing="8">
+                <ProgressBar IsIndeterminate="True" Width="200" Height="4"/>
+                <TextBlock Text="加载收藏夹中..." 
+                           FontSize="14"
+                           HorizontalAlignment="Center"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+            </StackPanel>
+
+            <!-- 空状态 -->
+            <StackPanel IsVisible="{Binding !HasItems}"
+                        HorizontalAlignment="Center" 
+                        VerticalAlignment="Center"
+                        Spacing="8">
+                <TextBlock Text="📦" 
+                           FontSize="48"
+                           HorizontalAlignment="Center"/>
+                <TextBlock Text="{Binding EmptyMessage}" 
+                           FontSize="15"
+                           HorizontalAlignment="Center"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+            </StackPanel>
+
+            <!-- 收藏列表 -->
+            <ScrollViewer IsVisible="{Binding !IsLoading}" Padding="16,0">
+                <ItemsControl x:Name="FavoriteList" ItemsSource="{Binding FavoriteGroups}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="m:FavoriteGroup">
+                            <StackPanel>
+                                <!-- 合集分组头 — 与版本列表的 MajorVersion 分组头一致 -->
+                                <ToggleButton x:Name="GroupToggle"
+                                             Padding="12,10"
+                                             HorizontalAlignment="Stretch"
+                                             HorizontalContentAlignment="Stretch"
+                                             Background="Transparent"
+                                             BorderThickness="0,0,0,1"
+                                             BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}">
+                                    <DockPanel>
+                                        <TextBlock FontSize="16" FontWeight="SemiBold"
+                                                   DockPanel.Dock="Left">
+                                            <TextBlock.Text>
+                                                <MultiBinding StringFormat="{}{0} ({1})">
+                                                    <Binding Path="CollectionName"/>
+                                                    <Binding Path="ItemCount"/>
+                                                </MultiBinding>
+                                            </TextBlock.Text>
+                                        </TextBlock>
+                                    </DockPanel>
+                                </ToggleButton>
+                                <!-- 合集内的模组条目列表 -->
+                                <ItemsControl ItemsSource="{Binding Items}"
+                                             IsVisible="{Binding IsChecked, ElementName=GroupToggle}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="m:FavoriteDisplayItem">
+                                            <Button Padding="12,10"
+                                                    Margin="0,4,0,0"
+                                                    BorderThickness="1"
+                                                    BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                                                    Background="Transparent"
+                                                    HorizontalAlignment="Stretch"
+                                                    Command="{Binding #FavoriteList.DataContext.NavigateToDetailCommand}"
+                                                    CommandParameter="{Binding}">
+                                                <Grid ColumnDefinitions="Auto,*">
+                                                    <!-- 左侧：类型标签 Badge -->
+                                                    <Border Grid.Column="0"
+                                                            CornerRadius="4"
+                                                            Padding="6,2"
+                                                            Background="{Binding ProjectType, 
+                                                                Converter={x:Static conv:ProjectTypeBrushConverter.Instance}}">
+                                                        <TextBlock Text="{Binding DisplayTypeTag}"
+                                                                   FontSize="13"
+                                                                   FontWeight="SemiBold"/>
+                                                    </Border>
+                                                    <!-- 右侧：文本信息 -->
+                                                    <StackPanel Grid.Column="1" 
+                                                                Margin="8,0,0,0"
+                                                                Spacing="2">
+                                                        <!-- 主行：模组名 -->
+                                                        <TextBlock Text="{Binding DisplayName}" 
+                                                                   FontSize="15"
+                                                                   VerticalAlignment="Center"/>
+                                                        <!-- 副行：描述 -->
+                                                        <TextBlock Text="{Binding DisplayDescription}" 
+                                                                   FontSize="13"
+                                                                   MaxLines="1"
+                                                                   TextTrimming="CharacterEllipsis"
+                                                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                                                        <!-- 底行：下载量 + 收藏时间 -->
+                                                        <StackPanel Orientation="Horizontal" 
+                                                                    Spacing="12">
+                                                            <TextBlock FontSize="12"
+                                                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}">
+                                                                <TextBlock.Text>
+                                                                    <MultiBinding StringFormat="↓ {0} 下载">
+                                                                        <Binding Path="FormattedDownloads"/>
+                                                                    </MultiBinding>
+                                                                </TextBlock.Text>
+                                                            </TextBlock>
+                                                            <TextBlock FontSize="12"
+                                                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}">
+                                                                <TextBlock.Text>
+                                                                    <MultiBinding StringFormat="★ {0} 收藏">
+                                                                        <Binding Path="FormattedDate"/>
+                                                                    </MultiBinding>
+                                                                </TextBlock.Text>
+                                                            </TextBlock>
+                                                        </StackPanel>
+                                                    </StackPanel>
+                                                </Grid>
+                                            </Button>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </Panel>
+    </DockPanel>
+</UserControl>

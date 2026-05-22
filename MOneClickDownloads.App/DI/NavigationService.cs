@@ -53,5 +53,15 @@ namespace MOneClickDownloads.App.DI
             return ActivatorUtilities.CreateInstance<ModDetailViewModel>(
                 _serviceProvider, projectId, projectTitle, projectDescription, projectSlug!);
         }
+
+        /// <summary>
+        /// 创建收藏夹列表页面 ViewModel。
+        /// 从 DI 容器解析 FavoritesViewModel（Transient），注入 INavigationService 和 IFavoriteService。
+        /// </summary>
+        /// <returns>收藏夹列表页面 ViewModel</returns>
+        public FavoritesViewModel CreateFavoritesViewModel()
+        {
+            return _serviceProvider.GetRequiredService<FavoritesViewModel>();
+        }
     }
 }

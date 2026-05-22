@@ -45,6 +45,15 @@ namespace MOneClickDownloads.App.ViewModels
         }
 
         /// <summary>
+        /// 导航到收藏夹列表页面
+        /// </summary>
+        public void NavigateToFavorites()
+        {
+            Logger.Information("导航到收藏夹列表页面");
+            CurrentViewModel = _navigation.CreateFavoritesViewModel();
+        }
+
+        /// <summary>
         /// 导航到模组详情页面（版本选择页）
         /// </summary>
         /// <param name="projectId">项目ID</param>
