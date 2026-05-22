@@ -79,7 +79,7 @@ namespace MOneClickDownloads.App.ViewModels
         {
             if (hit == null) return;
             _logger.Information("用户选择模组: ProjectId={ProjectId}, Title={Title}", hit.ProjectId, hit.Title);
-            _mainVm.NavigateToDetail(hit.ProjectId, hit.Title, hit.Description);
+            _mainVm.NavigateToDetail(hit.ProjectId, hit.Title, hit.Description, hit.Slug);
         }
     }
 }

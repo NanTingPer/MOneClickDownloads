@@ -77,7 +77,10 @@ namespace MOneClickDownloads.App.ViewModels
         private CancellationTokenSource? _downloadCts;
         private bool _downloadCompleted;
 
-        public ModDetailViewModel(MainWindowViewModel mainVm, string projectId, string projectTitle, string projectDescription)
+        [ObservableProperty]
+        private string? _projectSlug;
+
+        public ModDetailViewModel(MainWindowViewModel mainVm, string projectId, string projectTitle, string projectDescription, string? projectSlug = null)
         {
             _mainVm = mainVm;
             _downloadService = mainVm.DownloadService;
@@ -88,8 +91,9 @@ namespace MOneClickDownloads.App.ViewModels
             _projectId = projectId;
             _projectTitle = projectTitle;
             _projectDescription = projectDescription;
+            _projectSlug = projectSlug;
 
-            _logger.Information("ModDetailViewModel 初始化: ProjectId={ProjectId}, Title={Title}", projectId, projectTitle);
+            _logger.Information("ModDetailViewModel 初始化: ProjectId={ProjectId}, Title={Title}, Slug={Slug}", projectId, projectTitle, projectSlug ?? "null");
 
             // 启动加载
             LoadVersionsCommand.Execute(null);
@@ -404,7 +408,9 @@ namespace MOneClickDownloads.App.ViewModels
                     versionType,
                     progress,
                     _downloadCts.Token,
-                    conflictCallback
+                    conflictCallback,
+                    ProjectSlug,
+                    ProjectTitle
                 );
 
                 stopwatch.Stop();

@@ -77,10 +77,11 @@ namespace MOneClickDownloads.App.ViewModels
         /// <param name="projectId">项目ID</param>
         /// <param name="projectTitle">项目标题</param>
         /// <param name="projectDescription">项目描述</param>
-        public void NavigateToDetail(string projectId, string projectTitle, string projectDescription)
+        /// <param name="projectSlug">项目 slug，用于下载前冲突预检</param>
+        public void NavigateToDetail(string projectId, string projectTitle, string projectDescription, string? projectSlug = null)
         {
-            Logger.Information("导航到模组详情页面: ProjectId={ProjectId}, Title={Title}", projectId, projectTitle);
-            CurrentViewModel = new ModDetailViewModel(this, projectId, projectTitle, projectDescription);
+            Logger.Information("导航到模组详情页面: ProjectId={ProjectId}, Title={Title}, Slug={Slug}", projectId, projectTitle, projectSlug ?? "null");
+            CurrentViewModel = new ModDetailViewModel(this, projectId, projectTitle, projectDescription, projectSlug);
         }
     }
 }

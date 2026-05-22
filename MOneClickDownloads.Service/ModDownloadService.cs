@@ -41,12 +41,12 @@ namespace MOneClickDownloads.Service
     /// 2. 按版本类型筛选（release > beta > alpha）并选取目标版本<br />
     /// 3. 使用 <code>LocalModInventory</code> 扫描本地文件夹<br />
     /// 4. 获取版本的 primary 文件下载链接<br />
-    /// 5. 检查本地是否已有同ID模组 → 若有冲突则调用回调<br />
-    /// 6. 根据冲突解决策略：Skip 跳过 / Replace 替换 / KeepBoth 改名下载<br />
-    /// 7. 下载文件到本地<br />
-    /// 8. 遍历 <code>Dependencies</code>，筛选 <code>Required</code> 依赖<br />
-    /// 9. 递归执行步骤 4-8（已下载项目跳过，防止循环依赖）<br />
-    /// 10. 若任何步骤失败（重试3次后仍失败）或被取消 → 回滚所有已下载文件<br />
+    /// 5. 下载前预检：按 slug/title 与本地模组匹配<br />
+    /// 6. 下载临时文件后分析 JAR 提取 ModId 进行冲突检测<br />
+    /// 7. 若仍未命中，回退到文件名匹配<br />
+    /// 8. 根据冲突解决策略：Skip 跳过 / Replace 替换 / KeepBoth 改名下载<br />
+    /// 9. 遍历 <code>Dependencies</code>，筛选 <code>Required</code> 依赖并递归下载<br />
+    /// 10. 若任何步骤失败或被取消 → 回滚所有已下载文件<br />
     /// <br />
     /// 使用示例：<br />
     /// <code>
@@ -54,19 +54,12 @@ namespace MOneClickDownloads.Service
     /// var analysisService = new ModAnalysisService();
     /// var downloadService = new ModDownloadService(apiService, analysisService);
     /// 
-    /// // 带冲突检测的推荐下载
+    /// // 带冲突检测的推荐下载（传递 slug/title 用于下载前预检）
     /// var progress = new Progress<DownloadProgress>(p => Console.WriteLine($"{p.Percentage:F1}% - {p.CurrentFileName}"));
-    /// ModConflictCallback conflictCallback = async (info) =>
-    /// {
-    ///     // 可以弹窗让用户选择
-    ///     return ModConflictResolution.Replace;
-    /// };
+    /// ModConflictCallback conflictCallback = async (info) => ModConflictResolution.Replace;
     /// var results = await downloadService.DownloadRecommendedAsync(
-    ///     "fabric-api", "1.20.1", "fabric", @"C:\mods", progress, cancellationToken, conflictCallback);
-    /// 
-    /// // 无冲突检测的下载（兼容旧用法）
-    /// var results = await downloadService.DownloadRecommendedAsync(
-    ///     "fabric-api", "1.20.1", "fabric", @"C:\mods", progress, cancellationToken);
+    ///     "fabric-api", "1.20.1", "fabric", @"C:\mods", progress, cancellationToken, conflictCallback,
+    ///     projectSlug: "fabric-api", projectTitle: "Fabric API");
     /// </code>
     /// </summary>
     public class ModDownloadService
@@ -117,6 +110,8 @@ namespace MOneClickDownloads.Service
         /// <param name="progress">进度报告回调</param>
         /// <param name="cancellationToken">取消令牌</param>
         /// <param name="conflictCallback">冲突回调（为 null 则不检测冲突）</param>
+        /// <param name="projectSlug">项目 slug（如 "fabric-api"），用于下载前预检冲突</param>
+        /// <param name="projectTitle">项目标题（如 "Fabric API"），用于下载前预检冲突</param>
         /// <returns>下载结果列表；若无稳定版则返回空列表</returns>
         /// <exception cref="DownloadException">下载失败（重试耗尽）或被取消时抛出</exception>
         public async Task<List<DownloadResult>> DownloadRecommendedAsync(
@@ -126,7 +121,9 @@ namespace MOneClickDownloads.Service
             string saveDirectory,
             IProgress<DownloadProgress>? progress = null,
             CancellationToken cancellationToken = default,
-            ModConflictCallback? conflictCallback = null)
+            ModConflictCallback? conflictCallback = null,
+            string? projectSlug = null,
+            string? projectTitle = null)
         {
             _logger.Information("开始推荐下载: ProjectId={ProjectId}, GameVersion={GameVersion}, Loader={Loader}, SaveDirectory={SaveDirectory}",
                 projectId, gameVersion, loader, saveDirectory);
@@ -155,7 +152,7 @@ namespace MOneClickDownloads.Service
             _logger.Information("选定推荐版本: {VersionName} (ID: {VersionId})", targetVersion.Name, targetVersion.Id);
 
             return await ExecuteDownloadTransactionAsync(
-                targetVersion, gameVersions, loaders, saveDirectory, true, progress, cancellationToken, conflictCallback);
+                targetVersion, gameVersions, loaders, saveDirectory, true, progress, cancellationToken, conflictCallback, projectSlug, projectTitle);
         }
 
         /// <summary>
@@ -176,6 +173,8 @@ namespace MOneClickDownloads.Service
         /// <param name="progress">进度报告回调</param>
         /// <param name="cancellationToken">取消令牌</param>
         /// <param name="conflictCallback">冲突回调（为 null 则不检测冲突）</param>
+        /// <param name="projectSlug">项目 slug，用于下载前预检冲突</param>
+        /// <param name="projectTitle">项目标题，用于下载前预检冲突</param>
         /// <returns>下载结果列表</returns>
         /// <exception cref="InvalidOperationException">无匹配版本时抛出</exception>
         /// <exception cref="DownloadException">下载失败或被取消时抛出</exception>
@@ -187,7 +186,9 @@ namespace MOneClickDownloads.Service
             string saveDirectory,
             IProgress<DownloadProgress>? progress = null,
             CancellationToken cancellationToken = default,
-            ModConflictCallback? conflictCallback = null)
+            ModConflictCallback? conflictCallback = null,
+            string? projectSlug = null,
+            string? projectTitle = null)
         {
             _logger.Information("开始指定版本下载: ProjectId={ProjectId}, GameVersion={GameVersion}, Loader={Loader}, VersionType={VersionType}",
                 projectId, gameVersion, loader, versionType);
@@ -214,7 +215,7 @@ namespace MOneClickDownloads.Service
             _logger.Information("选定版本: {VersionName} (ID: {VersionId})", targetVersion.Name, targetVersion.Id);
 
             return await ExecuteDownloadTransactionAsync(
-                targetVersion, gameVersions, loaders, saveDirectory, true, progress, cancellationToken, conflictCallback);
+                targetVersion, gameVersions, loaders, saveDirectory, true, progress, cancellationToken, conflictCallback, projectSlug, projectTitle);
         }
 
         /// <summary>
@@ -236,6 +237,8 @@ namespace MOneClickDownloads.Service
         /// <param name="progress">进度报告回调</param>
         /// <param name="cancellationToken">取消令牌</param>
         /// <param name="conflictCallback">冲突回调（为 null 则不检测冲突）</param>
+        /// <param name="projectSlug">项目 slug，用于下载前预检冲突</param>
+        /// <param name="projectTitle">项目标题，用于下载前预检冲突</param>
         /// <returns>下载结果列表（包含主模组和所有依赖）</returns>
         /// <exception cref="InvalidOperationException">无匹配版本时抛出</exception>
         /// <exception cref="DownloadException">下载失败或被取消时抛出</exception>
@@ -247,7 +250,9 @@ namespace MOneClickDownloads.Service
             VersionType versionType,
             IProgress<DownloadProgress>? progress = null,
             CancellationToken cancellationToken = default,
-            ModConflictCallback? conflictCallback = null)
+            ModConflictCallback? conflictCallback = null,
+            string? projectSlug = null,
+            string? projectTitle = null)
         {
             _logger.Information("开始带依赖下载: ProjectId={ProjectId}, GameVersion={GameVersion}, Loader={Loader}, VersionType={VersionType}, SaveDirectory={SaveDirectory}",
                 projectId, gameVersion, loader, versionType, saveDirectory);
@@ -274,7 +279,7 @@ namespace MOneClickDownloads.Service
             _logger.Information("选定版本: {VersionName} (ID: {VersionId})", targetVersion.Name, targetVersion.Id);
 
             return await ExecuteDownloadTransactionAsync(
-                targetVersion, gameVersions, loaders, saveDirectory, true, progress, cancellationToken, conflictCallback);
+                targetVersion, gameVersions, loaders, saveDirectory, true, progress, cancellationToken, conflictCallback, projectSlug, projectTitle);
         }
 
         /// <summary>
@@ -286,11 +291,12 @@ namespace MOneClickDownloads.Service
         /// - 下载失败时重试3次<br />
         /// - 重试耗尽或取消时删除所有已下载文件（回滚）<br />
         /// <br />
-        /// 冲突检测流程：<br />
+        /// 冲突检测流程（三级检测）：<br />
         /// 1. 若 conflictCallback 不为 null → 创建 LocalModInventory 扫描本地<br />
-        /// 2. 对每个待下载文件，按 ModId 查询本地是否已有同ID模组<br />
-        /// 3. 若已有 → 比较版本号确定冲突类型 → 调用回调获取用户决定<br />
-        /// 4. Skip → 跳过该文件；Replace → 删除旧文件后下载；KeepBoth → 改名下载<br />
+        /// 2. 下载前预检：若提供 slug/title，先按 slug→ModId 和 title→Name 匹配本地模组<br />
+        /// 3. 若预检未命中 → 下载临时文件 → 分析 JAR 提取 ModId → 按 ModId 检测<br />
+        /// 4. 若 JAR 分析也未命中 → 回退到文件名匹配<br />
+        /// 5. Skip → 跳过该文件；Replace → 删除旧文件后下载；KeepBoth → 改名下载
         /// </summary>
         /// <param name="version">目标版本</param>
         /// <param name="gameVersions">游戏版本列表</param>
@@ -300,6 +306,8 @@ namespace MOneClickDownloads.Service
         /// <param name="progress">进度回调</param>
         /// <param name="cancellationToken">取消令牌</param>
         /// <param name="conflictCallback">冲突回调（为 null 则不检测冲突）</param>
+        /// <param name="projectSlug">项目 slug，用于下载前预检冲突</param>
+        /// <param name="projectTitle">项目标题，用于下载前预检冲突</param>
         /// <returns>下载结果列表</returns>
         /// <exception cref="DownloadException">下载失败或被取消时抛出</exception>
         private async Task<List<DownloadResult>> ExecuteDownloadTransactionAsync(
@@ -310,7 +318,9 @@ namespace MOneClickDownloads.Service
             bool downloadDependencies,
             IProgress<DownloadProgress>? progress,
             CancellationToken cancellationToken,
-            ModConflictCallback? conflictCallback = null)
+            ModConflictCallback? conflictCallback = null,
+            string? projectSlug = null,
+            string? projectTitle = null)
         {
             var downloadedFiles = new List<string>();
             var downloadedProjects = new HashSet<string>();
@@ -375,11 +385,64 @@ namespace MOneClickDownloads.Service
                         CurrentProjectName = ver.Name
                     });
 
+                    // === 冲突检测第一级：下载前预检（仅主模组，依赖不做预检） ===
+                    if (inventory != null && conflictCallback != null && !isDependency)
+                    {
+                        var preCheckConflict = DetectConflictBySlugOrTitle(inventory, ver, file, projectSlug, projectTitle);
+                        if (preCheckConflict != null)
+                        {
+                            _logger.Information("通过 slug/title 预检检测到冲突（跳过下载）: Slug={Slug}, Title={Title}, ConflictType={Type}",
+                                projectSlug ?? "null", projectTitle ?? "null", preCheckConflict.ConflictType);
+
+                            var preResolution = await conflictCallback(preCheckConflict);
+                            switch (preResolution)
+                            {
+                                case ModConflictResolution.Skip:
+                                    _logger.Information("用户选择跳过（预检阶段）: {FileName}", file.Filename);
+                                    skipFile = true;
+                                    break;
+
+                                case ModConflictResolution.Replace:
+                                    // 删除旧文件
+                                    if (preCheckConflict.ExistingFilePath != null && File.Exists(preCheckConflict.ExistingFilePath))
+                                    {
+                                        _logger.Information("用户选择替换（预检阶段），删除旧文件: {OldPath}", preCheckConflict.ExistingFilePath);
+                                        File.Delete(preCheckConflict.ExistingFilePath);
+                                    }
+                                    // 继续下载（不 break）
+                                    break;
+
+                                case ModConflictResolution.KeepBoth:
+                                    // 改名，继续下载
+                                    var ext = Path.GetExtension(file.Filename);
+                                    var nameWithoutExt = Path.GetFileNameWithoutExtension(file.Filename);
+                                    actualFileName = $"{nameWithoutExt}-{ver.VersionNumber}{ext}";
+                                    _logger.Information("用户选择保留两者（预检阶段），新文件名: {NewName}", actualFileName);
+                                    finalSavePath = Path.Combine(saveDirectory, actualFileName);
+                                    tempSavePath = finalSavePath + ".downloading";
+                                    break;
+                            }
+                        }
+                    }
+
+                    if (skipFile)
+                    {
+                        completedCount++;
+                        progress?.Report(new DownloadProgress
+                        {
+                            CompletedCount = completedCount,
+                            TotalCount = totalCount,
+                            CurrentFileName = $"{file.Filename} (已跳过)",
+                            CurrentProjectName = ver.Name
+                        });
+                        continue;
+                    }
+
                     // 第一步：下载到临时文件
                     await DownloadFileWithRetryAsync(file.Url, tempSavePath, cancellationToken);
                     downloadedFiles.Add(tempSavePath);
 
-                    // 第二步：分析临时文件提取 ModId，进行冲突检测
+                    // === 冲突检测第二级：下载后分析 JAR 提取 ModId ===
                     if (inventory != null && conflictCallback != null)
                     {
                         ModConflictInfo? conflict = null;
@@ -407,7 +470,7 @@ namespace MOneClickDownloads.Service
                             _logger.Warning(ex, "分析临时文件失败，回退到文件名匹配: {TempPath}", tempSavePath);
                         }
 
-                        // 回退策略：按文件名匹配
+                        // === 冲突检测第三级：回退到文件名匹配 ===
                         if (conflict == null)
                         {
                             conflict = DetectConflictByFileName(inventory, ver, file);
@@ -464,7 +527,7 @@ namespace MOneClickDownloads.Service
                         continue;
                     }
 
-                    // 第三步：重命名临时文件为最终文件名
+                    // 第二步：重命名临时文件为最终文件名
                     if (actualFileName != file.Filename)
                     {
                         // 用户选择 KeepBoth，需要改名
@@ -526,7 +589,65 @@ namespace MOneClickDownloads.Service
         }
 
         /// <summary>
-        /// 通过已分析的 ModId 检测冲突（主策略）。<br />
+        /// 通过 slug/title 预检冲突（下载前第一级检测）。<br />
+        /// <br />
+        /// 匹配逻辑：<br />
+        /// 1. 若提供 slug → 按 slug 与本地 ModId 匹配（忽略大小写）<br />
+        /// 2. 若未命中且提供 title → 按 title 与本地 Name 匹配（忽略大小写）<br />
+        /// 3. 匹配成功 → 构造 ModConflictInfo 返回<br />
+        /// <br />
+        /// 注意：slug 在 Modrinth 上与 modId 语义相近（如 "fabric-api"），<br />
+        /// title 与 modName 语义相近（如 "Fabric API"），可作为下载前的快速预判依据。
+        /// </summary>
+        /// <param name="inventory">本地模组清单</param>
+        /// <param name="version">待下载的版本信息</param>
+        /// <param name="file">待下载的文件信息</param>
+        /// <param name="projectSlug">项目 slug</param>
+        /// <param name="projectTitle">项目标题</param>
+        /// <returns>冲突信息；无冲突返回 null</returns>
+        private ModConflictInfo? DetectConflictBySlugOrTitle(
+            LocalModInventory inventory,
+            ModrinthVersion version,
+            VersionFile file,
+            string? projectSlug,
+            string? projectTitle)
+        {
+            ModAnalysisResult? existing = null;
+
+            // 第一优先：按 slug 匹配本地 ModId
+            if (!string.IsNullOrEmpty(projectSlug))
+            {
+                existing = inventory.FindByModId(projectSlug);
+                if (existing != null)
+                {
+                    _logger.Debug("slug 预检命中: {Slug} → ModId={ModId}", projectSlug, existing.ModId);
+                }
+            }
+
+            // 第二优先：按 title 匹配本地 Name
+            if (existing == null && !string.IsNullOrEmpty(projectTitle))
+            {
+                foreach (var installed in inventory.InstalledMods)
+                {
+                    if (string.Equals(installed.Name, projectTitle, StringComparison.OrdinalIgnoreCase))
+                    {
+                        existing = installed;
+                        _logger.Debug("title 预检命中: {Title} → ModId={ModId}", projectTitle, existing.ModId);
+                        break;
+                    }
+                }
+            }
+
+            if (existing == null)
+            {
+                return null; // 预检未命中
+            }
+
+            return BuildConflictInfo(inventory, existing, version, file);
+        }
+
+        /// <summary>
+        /// 通过已分析的 ModId 检测冲突（第二级检测）。<br />
         /// <br />
         /// 使用下载后分析临时文件得到的 ModId 去本地清单中查找同 ID 模组。
         /// </summary>
@@ -547,61 +668,13 @@ namespace MOneClickDownloads.Service
                 return null; // 本地无同 ModId 模组
             }
 
-            var existingVersion = existing.Version;
-            var newVersion = version.VersionNumber;
-            var existingFilePath = inventory.GetModFilePath(downloadedAnalysis.ModId);
-
-            // 版本完全相同
-            if (string.Equals(existingVersion, newVersion, StringComparison.OrdinalIgnoreCase))
-            {
-                return new ModConflictInfo
-                {
-                    ConflictType = ModConflictType.SameModExists,
-                    ModId = existing.ModId,
-                    ModName = existing.Name,
-                    ExistingVersion = existingVersion,
-                    ExistingFilePath = existingFilePath,
-                    NewVersion = newVersion,
-                    NewFileName = file.Filename
-                };
-            }
-
-            // 版本比较
-            var comparison = CompareVersions(existingVersion, newVersion);
-            if (comparison > 0)
-            {
-                // 本地版本更高
-                return new ModConflictInfo
-                {
-                    ConflictType = ModConflictType.HigherVersionExists,
-                    ModId = existing.ModId,
-                    ModName = existing.Name,
-                    ExistingVersion = existingVersion,
-                    ExistingFilePath = existingFilePath,
-                    NewVersion = newVersion,
-                    NewFileName = file.Filename
-                };
-            }
-            else
-            {
-                // 本地版本更低（可升级）
-                return new ModConflictInfo
-                {
-                    ConflictType = ModConflictType.LowerVersionExists,
-                    ModId = existing.ModId,
-                    ModName = existing.Name,
-                    ExistingVersion = existingVersion,
-                    ExistingFilePath = existingFilePath,
-                    NewVersion = newVersion,
-                    NewFileName = file.Filename
-                };
-            }
+            return BuildConflictInfo(inventory, existing, version, file);
         }
 
         /// <summary>
-        /// 通过文件名检测冲突（回退策略）。<br />
+        /// 通过文件名检测冲突（第三级检测）。<br />
         /// <br />
-        /// 当临时文件分析失败时，使用文件名精确匹配作为回退。
+        /// 当预检和 JAR 分析均未命中时，使用文件名精确匹配作为最终回退。
         /// </summary>
         /// <param name="inventory">本地模组清单</param>
         /// <param name="version">待下载的版本信息</param>
@@ -618,9 +691,39 @@ namespace MOneClickDownloads.Service
                 return null; // 无冲突
             }
 
+            var existingFilePath = inventory.GetFilePathByFileName(file.Filename);
+            return BuildConflictInfo(existing, version, file, existingFilePath);
+        }
+
+        /// <summary>
+        /// 构造冲突信息的通用辅助方法。<br />
+        /// <br />
+        /// 比较本地已安装模组版本与待下载版本，确定冲突类型。
+        /// </summary>
+        private static ModConflictInfo BuildConflictInfo(
+            LocalModInventory inventory,
+            ModAnalysisResult existing,
+            ModrinthVersion version,
+            VersionFile file)
+        {
             var existingVersion = existing.Version;
             var newVersion = version.VersionNumber;
-            var existingFilePath = inventory.GetFilePathByFileName(file.Filename);
+            var existingFilePath = inventory.GetModFilePath(existing.ModId);
+
+            return BuildConflictInfo(existing, version, file, existingFilePath);
+        }
+
+        /// <summary>
+        /// 构造冲突信息的核心逻辑。
+        /// </summary>
+        private static ModConflictInfo BuildConflictInfo(
+            ModAnalysisResult existing,
+            ModrinthVersion version,
+            VersionFile file,
+            string? existingFilePath)
+        {
+            var existingVersion = existing.Version;
+            var newVersion = version.VersionNumber;
 
             // 版本完全相同
             if (string.Equals(existingVersion, newVersion, StringComparison.OrdinalIgnoreCase))
