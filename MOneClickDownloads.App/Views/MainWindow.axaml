@@ -12,6 +12,79 @@
         MinWidth="700" MinHeight="450"
         WindowStartupLocation="CenterScreen">
 
-    <ContentControl Content="{Binding CurrentViewModel}" />
+    <Grid>
+        <!-- 主布局：工具栏 + (侧边栏 | 内容区) -->
+        <DockPanel>
+            <!-- 顶部工具栏 -->
+            <Border DockPanel.Dock="Top"
+                    Classes="sidebar-toolbar">
+                <DockPanel>
+                    <!-- 面包屑开关按钮 -->
+                    <Button Classes="sidebar-toggle-btn cursor-pointer"
+                            Command="{Binding ToggleSidebarCommand}"
+                            DockPanel.Dock="Left"
+                            Width="40" Height="40"
+                            Padding="0">
+                        <TextBlock Text="三" FontSize="18"/>
+                    </Button>
+                    <!-- 面包屑导航 -->
+                    <StackPanel Orientation="Horizontal"
+                                Classes="gap-1 items-center"
+                                Margin="12,0,0,0"
+                                VerticalAlignment="Center">
+                        <TextBlock Text="主页"
+                                   Classes="text-muted text-xs"/>
+                        <TextBlock Text="/"
+                                   Classes="text-muted text-xs"/>
+                        <TextBlock Text="{Binding CurrentPageName}"
+                                   Classes="text-xs font-bold"/>
+                    </StackPanel>
+                </DockPanel>
+            </Border>
 
+            <!-- 下方区域：侧边栏 + 内容 -->
+            <Panel>
+                <!-- 内容区域（始终占满） -->
+                <ContentControl Content="{Binding CurrentViewModel}"/>
+
+                <!-- 侧边栏遮罩层（点击可关闭） -->
+                <Border x:Name="SidebarOverlay"
+                        Classes="sidebar-overlay"
+                        IsVisible="False"
+                        Opacity="0"
+                        PointerPressed="OnOverlayPointerPressed"/>
+
+                <!-- 侧边栏面板 -->
+                <Border x:Name="SidebarPanel"
+                        Classes="sidebar-panel"
+                        Width="0"
+                        ClipToBounds="True"
+                        HorizontalAlignment="Left">
+                    <!-- 侧边栏内容 -->
+                    <StackPanel Classes="sidebar-content gap-2">
+                        <TextBlock Text="导航"
+                                   Classes="sidebar-header text-xs text-muted"/>
+                        <!-- 搜索页 -->
+                        <Button Classes="sidebar-nav-btn cursor-pointer"
+                                Tag="Search"
+                                Click="OnSidebarNavClick">
+                            <StackPanel Orientation="Horizontal" Classes="gap-2 items-center">
+                                <TextBlock Text="🔍" FontSize="16"/>
+                                <TextBlock Text="搜索"/>
+                            </StackPanel>
+                        </Button>
+                        <!-- 收藏夹 -->
+                        <Button Classes="sidebar-nav-btn cursor-pointer"
+                                Tag="Favorites"
+                                Click="OnSidebarNavClick">
+                            <StackPanel Orientation="Horizontal" Classes="gap-2 items-center">
+                                <TextBlock Text="⭐" FontSize="16"/>
+                                <TextBlock Text="收藏夹"/>
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </Border>
+            </Panel>
+        </DockPanel>
+    </Grid>
 </Window>

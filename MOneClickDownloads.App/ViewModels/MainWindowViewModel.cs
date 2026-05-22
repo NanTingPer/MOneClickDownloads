@@ -1,4 +1,6 @@
-﻿using MOneClickDownloads.App.DI;
+﻿using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using MOneClickDownloads.App.DI;
 using Serilog;
 
 namespace MOneClickDownloads.App.ViewModels
@@ -20,6 +22,18 @@ namespace MOneClickDownloads.App.ViewModels
         }
 
         /// <summary>
+        /// 侧边栏是否展开。
+        /// </summary>
+        [ObservableProperty]
+        private bool _isSidebarOpen;
+
+        /// <summary>
+        /// 当前导航页面名称，用于面包屑显示。
+        /// </summary>
+        [ObservableProperty]
+        private string _currentPageName = "搜索";
+
+        /// <summary>
         /// 构造 MainWindowViewModel，通过导航服务协调页面创建。
         /// <br />
         /// 注意：初始导航由 App.axaml.cs 在容器构建完成后触发，不在构造函数中调用，
@@ -33,6 +47,16 @@ namespace MOneClickDownloads.App.ViewModels
             _navigation = navigation;
 
             Logger.Information("MainWindowViewModel 初始化完成");
+        }
+
+        /// <summary>
+        /// 切换侧边栏展开/收起状态。
+        /// </summary>
+        [RelayCommand]
+        private void ToggleSidebar()
+        {
+            IsSidebarOpen = !IsSidebarOpen;
+            Logger.Information("侧边栏状态切换: {State}", IsSidebarOpen ? "展开" : "收起");
         }
 
         /// <summary>
