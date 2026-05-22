@@ -136,6 +136,27 @@ namespace MOneClickDownloads.App.ViewModels
         }
 
         /// <summary>
+        /// 创建新收藏夹
+        /// </summary>
+        /// <param name="name">收藏夹名称</param>
+        [RelayCommand]
+        private void CreateCollection(string? name)
+        {
+            if (string.IsNullOrWhiteSpace(name)) return;
+
+            try
+            {
+                var collection = _favoriteService.CreateCollection(name.Trim());
+                Logger.Information("已创建新收藏夹: {Name}, Id={Id}", collection.Name, collection.Id);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "创建收藏夹失败: {Name}", name);
+            }
+            // Changed 事件会自动触发 LoadCollections
+        }
+
+        /// <summary>
         /// 从收藏中移除模组
         /// </summary>
         [RelayCommand]

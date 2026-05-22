@@ -19,9 +19,17 @@
                         HorizontalAlignment="Left"
                         Padding="8,4"/>
                 
-                <!-- 标题 -->
-                <TextBlock Text="我的收藏夹" 
-                           FontSize="22" FontWeight="Bold"/>
+                <!-- 标题行：标题 + 创建按钮 -->
+                <DockPanel>
+                    <TextBlock Text="我的收藏夹" 
+                               FontSize="22" FontWeight="Bold"
+                               DockPanel.Dock="Left"/>
+                    <Button Content="＋ 创建收藏夹"
+                            Click="OnCreateCollectionClick"
+                            DockPanel.Dock="Right"
+                            Padding="12,6"
+                            FontSize="14"/>
+                </DockPanel>
             </StackPanel>
         </Border>
 
