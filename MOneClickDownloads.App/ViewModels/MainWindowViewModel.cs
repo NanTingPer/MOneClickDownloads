@@ -34,6 +34,11 @@ namespace MOneClickDownloads.App.ViewModels
         /// </summary>
         public IModAnalysisService ModAnalysisService { get; }
 
+        /// <summary>
+        /// 共享的模组冲突检测服务
+        /// </summary>
+        public IModConflictService ConflictService { get; }
+
         private ViewModelBase? _currentViewModel;
         /// <summary>
         /// 当前显示的子页面 ViewModel，通过 ViewLocator 自动匹配 View。
@@ -54,7 +59,8 @@ namespace MOneClickDownloads.App.ViewModels
             var configPath = Path.Combine(AppContext.BaseDirectory, "configs", "app.json");
             ConfigService = new ConfigService(configPath);
             ModAnalysisService = new ModAnalysisService();
-            DownloadService = new ModDownloadService(ApiService, ModAnalysisService);
+            ConflictService = new ModConflictService();
+            DownloadService = new ModDownloadService(ApiService, ModAnalysisService, ConflictService);
 
             // 默认显示搜索页
             NavigateToSearch();

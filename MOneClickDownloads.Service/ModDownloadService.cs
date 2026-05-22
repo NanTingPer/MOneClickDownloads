@@ -1,4 +1,3 @@
-using System.Text.RegularExpressions;
 using MOneClickDownloads.DataModel.Enums;
 using MOneClickDownloads.DataModel.Mod;
 using MOneClickDownloads.DataModel.Version;
@@ -32,7 +31,7 @@ namespace MOneClickDownloads.Service
     /// - 支持推荐下载（最新稳定版）和指定版本类型下载<br />
     /// - 递归下载必需依赖（Required），支持3次重试<br />
     /// - 事务性下载：失败或取消时回滚所有已下载文件<br />
-    /// - 下载前检测本地冲突（同ID模组版本比较），支持冲突回调<br />
+    /// - 下载前检测本地冲突（委托 <see cref="IModConflictService"/> 执行三级检测）<br />
     /// - 通过 <code>IProgress<DownloadProgress></code> 报告下载进度<br />
     /// - 通过 <code>CancellationToken</code> 支持取消操作（取消后回滚）<br />
     /// <br />
@@ -41,9 +40,9 @@ namespace MOneClickDownloads.Service
     /// 2. 按版本类型筛选（release > beta > alpha）并选取目标版本<br />
     /// 3. 使用 <code>LocalModInventory</code> 扫描本地文件夹<br />
     /// 4. 获取版本的 primary 文件下载链接<br />
-    /// 5. 下载前预检：按 slug/title 与本地模组匹配<br />
-    /// 6. 下载临时文件后分析 JAR 提取 ModId 进行冲突检测<br />
-    /// 7. 若仍未命中，回退到文件名匹配<br />
+    /// 5. 下载前预检：通过 <see cref="IModConflictService.DetectBySlugOrTitle"/> 按 slug/title 匹配<br />
+    /// 6. 下载临时文件后分析 JAR，通过 <see cref="IModConflictService.DetectByModId"/> 检测冲突<br />
+    /// 7. 若仍未命中，通过 <see cref="IModConflictService.DetectByFileName"/> 回退到文件名匹配<br />
     /// 8. 根据冲突解决策略：Skip 跳过 / Replace 替换 / KeepBoth 改名下载<br />
     /// 9. 遍历 <code>Dependencies</code>，筛选 <code>Required</code> 依赖并递归下载<br />
     /// 10. 若任何步骤失败或被取消 → 回滚所有已下载文件<br />
@@ -52,7 +51,8 @@ namespace MOneClickDownloads.Service
     /// <code>
     /// var apiService = new ModrinthAPIService();
     /// var analysisService = new ModAnalysisService();
-    /// var downloadService = new ModDownloadService(apiService, analysisService);
+    /// var conflictService = new ModConflictService();
+    /// var downloadService = new ModDownloadService(apiService, analysisService, conflictService);
     /// 
     /// // 带冲突检测的推荐下载（传递 slug/title 用于下载前预检）
     /// var progress = new Progress<DownloadProgress>(p => Console.WriteLine($"{p.Percentage:F1}% - {p.CurrentFileName}"));
@@ -69,6 +69,7 @@ namespace MOneClickDownloads.Service
 
         private readonly ModrinthAPIService _apiService;
         private readonly IModAnalysisService _analysisService;
+        private readonly IModConflictService _conflictService;
         private readonly ILogger _logger;
 
         /// <summary>
@@ -77,6 +78,7 @@ namespace MOneClickDownloads.Service
         /// 数据流：<br />
         /// - 注入 ModrinthAPIService 实例以复用HTTP连接和配置<br />
         /// - 注入 IModAnalysisService 用于扫描本地已安装模组<br />
+        /// - 注入 IModConflictService 用于冲突检测<br />
         /// - 后续所有API调用通过此实例进行<br />
         /// <br />
         /// 使用场景：<br />
@@ -84,11 +86,13 @@ namespace MOneClickDownloads.Service
         /// - 通常与 ModSearchService 共享同一个 ModrinthAPIService 实例
         /// </summary>
         /// <param name="apiService">Modrinth API 服务实例</param>
-        /// <param name="analysisService">模组文件分析服务（用于冲突检测）</param>
-        public ModDownloadService(ModrinthAPIService apiService, IModAnalysisService analysisService)
+        /// <param name="analysisService">模组文件分析服务（用于冲突检测时扫描本地模组）</param>
+        /// <param name="conflictService">模组冲突检测服务</param>
+        public ModDownloadService(ModrinthAPIService apiService, IModAnalysisService analysisService, IModConflictService conflictService)
         {
             _apiService = apiService ?? throw new ArgumentNullException(nameof(apiService));
             _analysisService = analysisService ?? throw new ArgumentNullException(nameof(analysisService));
+            _conflictService = conflictService ?? throw new ArgumentNullException(nameof(conflictService));
             _logger = Log.ForContext<ModDownloadService>();
             _logger.Information("ModDownloadService 已初始化");
         }
@@ -224,7 +228,7 @@ namespace MOneClickDownloads.Service
         /// 完整数据流：<br />
         /// 1. 获取兼容版本 → 筛选目标版本（按 versionType）<br />
         /// 2. 使用 LocalModInventory 扫描本地文件夹<br />
-        /// 3. 获取 primary 文件 → 检测冲突 → 处理冲突 → 下载<br />
+        /// 3. 获取 primary 文件 → 通过 IModConflictService 检测冲突 → 处理冲突 → 下载<br />
         /// 4. 遍历 <code>Dependencies</code> → 递归下载 Required 依赖<br />
         /// 5. 任何下载失败 → 重试3次 → 仍失败 → 回滚所有已下载文件<br />
         /// 6. 取消操作 → 回滚所有已下载文件<br />
@@ -291,11 +295,11 @@ namespace MOneClickDownloads.Service
         /// - 下载失败时重试3次<br />
         /// - 重试耗尽或取消时删除所有已下载文件（回滚）<br />
         /// <br />
-        /// 冲突检测流程（三级检测）：<br />
+        /// 冲突检测流程（委托 <see cref="IModConflictService"/> 执行三级检测）：<br />
         /// 1. 若 conflictCallback 不为 null → 创建 LocalModInventory 扫描本地<br />
-        /// 2. 下载前预检：若提供 slug/title，先按 slug→ModId 和 title→Name 匹配本地模组<br />
-        /// 3. 若预检未命中 → 下载临时文件 → 分析 JAR 提取 ModId → 按 ModId 检测<br />
-        /// 4. 若 JAR 分析也未命中 → 回退到文件名匹配<br />
+        /// 2. 下载前预检：调用 <see cref="IModConflictService.DetectBySlugOrTitle"/> 按 slug/title 匹配<br />
+        /// 3. 若预检未命中 → 下载临时文件 → 分析 JAR → 调用 <see cref="IModConflictService.DetectByModId"/> 按 ModId 检测<br />
+        /// 4. 若 JAR 分析也未命中 → 调用 <see cref="IModConflictService.DetectByFileName"/> 回退到文件名匹配<br />
         /// 5. Skip → 跳过该文件；Replace → 删除旧文件后下载；KeepBoth → 改名下载
         /// </summary>
         /// <param name="version">目标版本</param>
@@ -388,7 +392,7 @@ namespace MOneClickDownloads.Service
                     // === 冲突检测第一级：下载前预检（仅主模组，依赖不做预检） ===
                     if (inventory != null && conflictCallback != null && !isDependency)
                     {
-                        var preCheckConflict = DetectConflictBySlugOrTitle(inventory, ver, file, projectSlug, projectTitle);
+                        var preCheckConflict = _conflictService.DetectBySlugOrTitle(inventory, ver, file, projectSlug, projectTitle);
                         if (preCheckConflict != null)
                         {
                             _logger.Information("通过 slug/title 预检检测到冲突（跳过下载）: Slug={Slug}, Title={Title}, ConflictType={Type}",
@@ -453,7 +457,7 @@ namespace MOneClickDownloads.Service
                             if (analysisResult != null)
                             {
                                 // 主策略：按本地 ModId 检测
-                                conflict = DetectConflictByModId(inventory, analysisResult, ver, file);
+                                conflict = _conflictService.DetectByModId(inventory, analysisResult, ver, file);
                                 if (conflict != null)
                                 {
                                     _logger.Information("通过 ModId 检测到冲突: ModId={ModId}, ConflictType={Type}",
@@ -473,7 +477,7 @@ namespace MOneClickDownloads.Service
                         // === 冲突检测第三级：回退到文件名匹配 ===
                         if (conflict == null)
                         {
-                            conflict = DetectConflictByFileName(inventory, ver, file);
+                            conflict = _conflictService.DetectByFileName(inventory, ver, file);
                             if (conflict != null)
                             {
                                 _logger.Information("通过文件名检测到冲突: FileName={FileName}, ConflictType={Type}",
@@ -586,266 +590,6 @@ namespace MOneClickDownloads.Service
                 RollbackDownloadedFiles(downloadedFiles);
                 throw new DownloadException($"下载过程中发生错误: {ex.Message}", ex);
             }
-        }
-
-        /// <summary>
-        /// 通过 slug/title 预检冲突（下载前第一级检测）。<br />
-        /// <br />
-        /// 匹配逻辑：<br />
-        /// 1. 若提供 slug → 按 slug 与本地 ModId 匹配（忽略大小写）<br />
-        /// 2. 若未命中且提供 title → 按 title 与本地 Name 匹配（忽略大小写）<br />
-        /// 3. 匹配成功 → 构造 ModConflictInfo 返回<br />
-        /// <br />
-        /// 注意：slug 在 Modrinth 上与 modId 语义相近（如 "fabric-api"），<br />
-        /// title 与 modName 语义相近（如 "Fabric API"），可作为下载前的快速预判依据。
-        /// </summary>
-        /// <param name="inventory">本地模组清单</param>
-        /// <param name="version">待下载的版本信息</param>
-        /// <param name="file">待下载的文件信息</param>
-        /// <param name="projectSlug">项目 slug</param>
-        /// <param name="projectTitle">项目标题</param>
-        /// <returns>冲突信息；无冲突返回 null</returns>
-        private ModConflictInfo? DetectConflictBySlugOrTitle(
-            LocalModInventory inventory,
-            ModrinthVersion version,
-            VersionFile file,
-            string? projectSlug,
-            string? projectTitle)
-        {
-            ModAnalysisResult? existing = null;
-
-            // 第一优先：按 slug 匹配本地 ModId
-            if (!string.IsNullOrEmpty(projectSlug))
-            {
-                existing = inventory.FindByModId(projectSlug);
-                if (existing != null)
-                {
-                    _logger.Debug("slug 预检命中: {Slug} → ModId={ModId}", projectSlug, existing.ModId);
-                }
-            }
-
-            // 第二优先：按 title 匹配本地 Name
-            if (existing == null && !string.IsNullOrEmpty(projectTitle))
-            {
-                foreach (var installed in inventory.InstalledMods)
-                {
-                    if (string.Equals(installed.Name, projectTitle, StringComparison.OrdinalIgnoreCase))
-                    {
-                        existing = installed;
-                        _logger.Debug("title 预检命中: {Title} → ModId={ModId}", projectTitle, existing.ModId);
-                        break;
-                    }
-                }
-            }
-
-            if (existing == null)
-            {
-                return null; // 预检未命中
-            }
-
-            return BuildConflictInfo(inventory, existing, version, file);
-        }
-
-        /// <summary>
-        /// 通过已分析的 ModId 检测冲突（第二级检测）。<br />
-        /// <br />
-        /// 使用下载后分析临时文件得到的 ModId 去本地清单中查找同 ID 模组。
-        /// </summary>
-        /// <param name="inventory">本地模组清单</param>
-        /// <param name="downloadedAnalysis">从临时文件分析得到的结果</param>
-        /// <param name="version">待下载的版本信息</param>
-        /// <param name="file">待下载的文件信息</param>
-        /// <returns>冲突信息；无冲突返回 null</returns>
-        private ModConflictInfo? DetectConflictByModId(
-            LocalModInventory inventory,
-            ModAnalysisResult downloadedAnalysis,
-            ModrinthVersion version,
-            VersionFile file)
-        {
-            var existing = inventory.FindByModId(downloadedAnalysis.ModId);
-            if (existing == null)
-            {
-                return null; // 本地无同 ModId 模组
-            }
-
-            return BuildConflictInfo(inventory, existing, version, file);
-        }
-
-        /// <summary>
-        /// 通过文件名检测冲突（第三级检测）。<br />
-        /// <br />
-        /// 当预检和 JAR 分析均未命中时，使用文件名精确匹配作为最终回退。
-        /// </summary>
-        /// <param name="inventory">本地模组清单</param>
-        /// <param name="version">待下载的版本信息</param>
-        /// <param name="file">待下载的文件信息</param>
-        /// <returns>冲突信息；无冲突返回 null</returns>
-        private ModConflictInfo? DetectConflictByFileName(
-            LocalModInventory inventory,
-            ModrinthVersion version,
-            VersionFile file)
-        {
-            var existing = inventory.FindByFileName(file.Filename);
-            if (existing == null)
-            {
-                return null; // 无冲突
-            }
-
-            var existingFilePath = inventory.GetFilePathByFileName(file.Filename);
-            return BuildConflictInfo(existing, version, file, existingFilePath);
-        }
-
-        /// <summary>
-        /// 构造冲突信息的通用辅助方法。<br />
-        /// <br />
-        /// 比较本地已安装模组版本与待下载版本，确定冲突类型。
-        /// </summary>
-        private static ModConflictInfo BuildConflictInfo(
-            LocalModInventory inventory,
-            ModAnalysisResult existing,
-            ModrinthVersion version,
-            VersionFile file)
-        {
-            var existingVersion = existing.Version;
-            var newVersion = version.VersionNumber;
-            var existingFilePath = inventory.GetModFilePath(existing.ModId);
-
-            return BuildConflictInfo(existing, version, file, existingFilePath);
-        }
-
-        /// <summary>
-        /// 构造冲突信息的核心逻辑。
-        /// </summary>
-        private static ModConflictInfo BuildConflictInfo(
-            ModAnalysisResult existing,
-            ModrinthVersion version,
-            VersionFile file,
-            string? existingFilePath)
-        {
-            var existingVersion = existing.Version;
-            var newVersion = version.VersionNumber;
-
-            // 版本完全相同
-            if (string.Equals(existingVersion, newVersion, StringComparison.OrdinalIgnoreCase))
-            {
-                return new ModConflictInfo
-                {
-                    ConflictType = ModConflictType.SameModExists,
-                    ModId = existing.ModId,
-                    ModName = existing.Name,
-                    ExistingVersion = existingVersion,
-                    ExistingFilePath = existingFilePath,
-                    NewVersion = newVersion,
-                    NewFileName = file.Filename
-                };
-            }
-
-            // 版本比较
-            var comparison = CompareVersions(existingVersion, newVersion);
-            if (comparison > 0)
-            {
-                // 本地版本更高
-                return new ModConflictInfo
-                {
-                    ConflictType = ModConflictType.HigherVersionExists,
-                    ModId = existing.ModId,
-                    ModName = existing.Name,
-                    ExistingVersion = existingVersion,
-                    ExistingFilePath = existingFilePath,
-                    NewVersion = newVersion,
-                    NewFileName = file.Filename
-                };
-            }
-            else
-            {
-                // 本地版本更低（可升级）
-                return new ModConflictInfo
-                {
-                    ConflictType = ModConflictType.LowerVersionExists,
-                    ModId = existing.ModId,
-                    ModName = existing.Name,
-                    ExistingVersion = existingVersion,
-                    ExistingFilePath = existingFilePath,
-                    NewVersion = newVersion,
-                    NewFileName = file.Filename
-                };
-            }
-        }
-
-        /// <summary>
-        /// 比较两个版本号字符串。<br />
-        /// <br />
-        /// 比较策略：<br />
-        /// 1. 先尝试解析为 SemVer（主.次.修订），逐级比较数值<br />
-        /// 2. 去除 + 后缀（build metadata）后比较<br />
-        /// 3. 解析失败则回退到字符串 OrdinalIgnoreCase 比较<br />
-        /// <br />
-        /// 返回值：<br />
-        /// - 正数：version1 > version2<br />
-        /// - 0：version1 == version2<br />
-        /// - 负数：version1 < version2
-        /// </summary>
-        /// <param name="version1">版本号1</param>
-        /// <param name="version2">版本号2</param>
-        /// <returns>比较结果</returns>
-        internal static int CompareVersions(string version1, string version2)
-        {
-            // 去除 + 后缀（build metadata）
-            var v1 = version1.Split('+')[0];
-            var v2 = version2.Split('+')[0];
-
-            // 去除 - 后缀（pre-release）但保留以比较
-            // 尝试解析为数字序列
-            var parts1 = ParseVersionParts(v1);
-            var parts2 = ParseVersionParts(v2);
-
-            if (parts1 != null && parts2 != null)
-            {
-                // 按主.次.修订逐级比较
-                var maxLen = Math.Max(parts1.Count, parts2.Count);
-                for (int i = 0; i < maxLen; i++)
-                {
-                    var p1 = i < parts1.Count ? parts1[i] : 0;
-                    var p2 = i < parts2.Count ? parts2[i] : 0;
-                    if (p1 != p2)
-                        return p1.CompareTo(p2);
-                }
-                return 0;
-            }
-
-            // 回退：字符串比较
-            return string.Compare(version1, version2, StringComparison.OrdinalIgnoreCase);
-        }
-
-        /// <summary>
-        /// 尝试将版本号解析为数字列表（如 "1.20.1" → [1, 20, 1]）。<br />
-        /// 遇到非数字部分时截断（如 "1.20.1-beta" → [1, 20, 1]）。<br />
-        /// 无法解析时返回 null。
-        /// </summary>
-        /// <param name="version">版本号字符串</param>
-        /// <returns>数字列表，或 null</returns>
-        private static List<int>? ParseVersionParts(string version)
-        {
-            var parts = new List<int>();
-            // 按 - 分割取第一段（忽略 pre-release 标识）
-            var numericPart = version.Split('-')[0];
-            // 按 . 分割，尝试解析每段为数字
-            foreach (var segment in numericPart.Split('.'))
-            {
-                // 去除前导非数字字符（如 "v1" → "1"）
-                var cleaned = Regex.Replace(segment, @"^[^\d]+", "");
-                if (string.IsNullOrEmpty(cleaned)) continue;
-                if (int.TryParse(cleaned, out var num))
-                {
-                    parts.Add(num);
-                }
-                else
-                {
-                    // 遇到无法解析的段 → 返回 null
-                    return parts.Count > 0 ? parts : null;
-                }
-            }
-            return parts.Count > 0 ? parts : null;
         }
 
         /// <summary>
