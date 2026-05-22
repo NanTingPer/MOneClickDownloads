@@ -62,7 +62,7 @@
             </StackPanel>
 
             <!-- 收藏列表 -->
-            <ScrollViewer IsVisible="{Binding !IsLoading}" Padding="16,0">
+            <ScrollViewer IsVisible="{Binding !IsLoading}" Padding="16,0,0,0">
                 <ItemsControl x:Name="FavoriteList" ItemsSource="{Binding FavoriteGroups}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="m:FavoriteGroup">
@@ -99,65 +99,89 @@
                                 </ToggleButton>
                                 <!-- 合集内的模组条目列表 -->
                                 <ItemsControl ItemsSource="{Binding Items}"
-                                             IsVisible="{Binding IsChecked, ElementName=GroupToggle}">
+                                             IsVisible="{Binding IsChecked, ElementName=GroupToggle}"
+                                             HorizontalAlignment="Stretch">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <StackPanel HorizontalAlignment="Stretch"/>
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate x:DataType="m:FavoriteDisplayItem">
-                                            <Button Padding="12,10"
-                                                    Margin="0,4,0,0"
+                                            <Border Margin="0,4,16,0"
                                                     BorderThickness="1"
                                                     BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
                                                     Background="Transparent"
-                                                    HorizontalAlignment="Stretch"
-                                                    Command="{Binding #FavoriteList.DataContext.NavigateToDetailCommand}"
-                                                    CommandParameter="{Binding}">
-                                                <Grid ColumnDefinitions="Auto,*">
-                                                    <!-- 左侧：类型标签 Badge -->
-                                                    <Border Grid.Column="0"
-                                                            CornerRadius="4"
-                                                            Padding="6,2"
-                                                            Background="{Binding ProjectType, 
-                                                                Converter={x:Static conv:ProjectTypeBrushConverter.Instance}}">
-                                                        <TextBlock Text="{Binding DisplayTypeTag}"
-                                                                   FontSize="13"
-                                                                   FontWeight="SemiBold"/>
-                                                    </Border>
-                                                    <!-- 右侧：文本信息 -->
-                                                    <StackPanel Grid.Column="1" 
-                                                                Margin="8,0,0,0"
-                                                                Spacing="2">
-                                                        <!-- 主行：模组名 -->
-                                                        <TextBlock Text="{Binding DisplayName}" 
-                                                                   FontSize="15"
-                                                                   VerticalAlignment="Center"/>
-                                                        <!-- 副行：描述 -->
-                                                        <TextBlock Text="{Binding DisplayDescription}" 
-                                                                   FontSize="13"
-                                                                   MaxLines="1"
-                                                                   TextTrimming="CharacterEllipsis"
-                                                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
-                                                        <!-- 底行：下载量 + 收藏时间 -->
-                                                        <StackPanel Orientation="Horizontal" 
-                                                                    Spacing="12">
-                                                            <TextBlock FontSize="12"
-                                                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}">
-                                                                <TextBlock.Text>
-                                                                    <MultiBinding StringFormat="↓ {0} 下载">
-                                                                        <Binding Path="FormattedDownloads"/>
-                                                                    </MultiBinding>
-                                                                </TextBlock.Text>
-                                                            </TextBlock>
-                                                            <TextBlock FontSize="12"
-                                                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}">
-                                                                <TextBlock.Text>
-                                                                    <MultiBinding StringFormat="★ {0} 收藏">
-                                                                        <Binding Path="FormattedDate"/>
-                                                                    </MultiBinding>
-                                                                </TextBlock.Text>
-                                                            </TextBlock>
-                                                        </StackPanel>
-                                                    </StackPanel>
+                                                    CornerRadius="4"
+                                                    HorizontalAlignment="Stretch">
+                                                <Grid ColumnDefinitions="*,Auto">
+                                                    <!-- 左侧：可点击跳转详情的区域 -->
+                                                    <Button Grid.Column="0"
+                                                            Padding="12,10"
+                                                            Background="Transparent"
+                                                            HorizontalAlignment="Stretch"
+                                                            HorizontalContentAlignment="Stretch"
+                                                            Command="{Binding #FavoriteList.DataContext.NavigateToDetailCommand}"
+                                                            CommandParameter="{Binding}">
+                                                        <Grid ColumnDefinitions="Auto,*">
+                                                            <!-- 左侧：类型标签 Badge -->
+                                                            <Border Grid.Column="0"
+                                                                    CornerRadius="4"
+                                                                    Padding="6,2"
+                                                                    Background="{Binding ProjectType, 
+                                                                        Converter={x:Static conv:ProjectTypeBrushConverter.Instance}}">
+                                                                <TextBlock Text="{Binding DisplayTypeTag}"
+                                                                           FontSize="13"
+                                                                           FontWeight="SemiBold"/>
+                                                            </Border>
+                                                            <!-- 右侧：文本信息 -->
+                                                            <StackPanel Grid.Column="1" 
+                                                                        Margin="8,0,0,0"
+                                                                        Spacing="2">
+                                                                <!-- 主行：模组名 -->
+                                                                <TextBlock Text="{Binding DisplayName}" 
+                                                                           FontSize="15"
+                                                                           VerticalAlignment="Center"/>
+                                                                <!-- 副行：描述 -->
+                                                                <TextBlock Text="{Binding DisplayDescription}" 
+                                                                           FontSize="13"
+                                                                           MaxLines="1"
+                                                                           TextTrimming="CharacterEllipsis"
+                                                                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                                                                <!-- 底行：下载量 + 收藏时间 -->
+                                                                <StackPanel Orientation="Horizontal" 
+                                                                            Spacing="12">
+                                                                    <TextBlock FontSize="12"
+                                                                               Foreground="{DynamicResource TextFillColorSecondaryBrush}">
+                                                                        <TextBlock.Text>
+                                                                            <MultiBinding StringFormat="↓ {0} 下载">
+                                                                                <Binding Path="FormattedDownloads"/>
+                                                                            </MultiBinding>
+                                                                        </TextBlock.Text>
+                                                                    </TextBlock>
+                                                                    <TextBlock FontSize="12"
+                                                                               Foreground="{DynamicResource TextFillColorSecondaryBrush}">
+                                                                        <TextBlock.Text>
+                                                                            <MultiBinding StringFormat="★ {0} 收藏">
+                                                                                <Binding Path="FormattedDate"/>
+                                                                            </MultiBinding>
+                                                                        </TextBlock.Text>
+                                                                    </TextBlock>
+                                                                </StackPanel>
+                                                            </StackPanel>
+                                                        </Grid>
+                                                    </Button>
+                                                    <!-- 右侧：删除按钮 -->
+                                                    <Button Grid.Column="1"
+                                                            Content="删除"
+                                                            FontSize="14"
+                                                            Padding="12,10"
+                                                            Background="Transparent"
+                                                            Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                                            VerticalAlignment="Stretch"
+                                                            Click="OnDeleteItemClick"/>
                                                 </Grid>
-                                            </Button>
+                                            </Border>
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>

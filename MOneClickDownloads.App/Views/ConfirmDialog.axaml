@@ -1,0 +1,30 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="400" d:DesignHeight="180"
+        x:Class="MOneClickDownloads.App.Views.ConfirmDialog"
+        Title="确认"
+        Width="400" Height="180"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False">
+
+    <DockPanel Margin="20,16">
+        <!-- 底部按钮区 -->
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal"
+                    Spacing="8" HorizontalAlignment="Right" Margin="0,16,0,0">
+            <Button Content="取消" Padding="20,8" FontSize="14"
+                    x:Name="CancelButton"/>
+            <Button Content="删除" Padding="20,8" FontSize="14"
+                    x:Name="ConfirmButton"/>
+        </StackPanel>
+
+        <!-- 内容区 -->
+        <StackPanel Spacing="12" VerticalAlignment="Top">
+            <TextBlock x:Name="TitleText" Text="确定删除吗？" FontSize="16" FontWeight="Bold"/>
+            <TextBlock x:Name="MessageText" Text="" FontSize="14"
+                       TextWrapping="Wrap"
+                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+        </StackPanel>
+    </DockPanel>
+</Window>
