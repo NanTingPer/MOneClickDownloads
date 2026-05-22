@@ -10,6 +10,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MOneClickDownloads.App.DI;
 using MOneClickDownloads.App.Models;
+using MOneClickDownloads.App.Views;
 using MOneClickDownloads.DataModel.Favorites;
 using MOneClickDownloads.Service;
 using Serilog;
@@ -175,6 +176,43 @@ namespace MOneClickDownloads.App.ViewModels
             {
                 _favoriteService.RemoveItem(collectionId, item.Item.ProjectId);
                 Logger.Information("已从合集 {CollectionId} 移除模组 {ProjectId}", collectionId, item.Item.ProjectId);
+            }
+            // Changed 事件会自动触发 LoadCollections
+        }
+
+        /// <summary>
+        /// 重命名收藏夹：弹出对话框让用户输入新名称
+        /// </summary>
+        /// <param name="group">要重命名的收藏夹分组</param>
+        [RelayCommand]
+        private async Task RenameCollectionAsync(FavoriteGroup? group)
+        {
+            if (group == null) return;
+
+            Logger.Information("用户请求重命名收藏夹: CollectionId={Id}, CurrentName={Name}", group.CollectionId, group.CollectionName);
+
+            // 获取主窗口作为对话框所有者
+            var owner = Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop
+                ? desktop.MainWindow
+                : null;
+
+            if (owner == null) return;
+
+            // 打开重命名对话框（复用 CreateCollectionDialog）
+            var dialog = new CreateCollectionDialog(isRename: true, currentName: group.CollectionName);
+            var result = await dialog.ShowDialog<string?>(owner);
+
+            if (string.IsNullOrWhiteSpace(result) || result.Trim() == group.CollectionName)
+                return;
+
+            try
+            {
+                _favoriteService.RenameCollection(group.CollectionId, result.Trim());
+                Logger.Information("已重命名收藏夹: {OldName} -> {NewName}", group.CollectionName, result.Trim());
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "重命名收藏夹失败: CollectionId={Id}", group.CollectionId);
             }
             // Changed 事件会自动触发 LoadCollections
         }

@@ -4,7 +4,7 @@ using Avalonia.Interactivity;
 namespace MOneClickDownloads.App.Views
 {
     /// <summary>
-    /// 创建收藏夹对话框，让用户输入新收藏夹名称。
+    /// 创建/重命名收藏夹对话框，让用户输入收藏夹名称。
     /// </summary>
     public partial class CreateCollectionDialog : Window
     {
@@ -13,9 +13,31 @@ namespace MOneClickDownloads.App.Views
         /// </summary>
         public string? CollectionName { get; private set; }
 
-        public CreateCollectionDialog()
+        /// <summary>
+        /// 创建模式（默认）
+        /// </summary>
+        public CreateCollectionDialog() : this(false, null) { }
+
+        /// <summary>
+        /// 支持创建和重命名两种模式。
+        /// </summary>
+        /// <param name="isRename">是否为重命名模式</param>
+        /// <param name="currentName">重命名时的当前名称</param>
+        public CreateCollectionDialog(bool isRename, string? currentName)
         {
             InitializeComponent();
+
+            if (isRename)
+            {
+                Title = "重命名收藏夹";
+                TitleText.Text = "请输入新的收藏夹名称";
+                CreateButton.Content = "确认";
+                if (!string.IsNullOrEmpty(currentName))
+                {
+                    NameTextBox.Text = currentName;
+                    NameTextBox.SelectAll();
+                }
+            }
 
             CancelButton.Click += OnCancel;
             CreateButton.Click += OnCreate;

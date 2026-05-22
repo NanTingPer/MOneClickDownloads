@@ -77,6 +77,9 @@
                                              BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}">
                                     <ToggleButton.ContextMenu>
                                         <ContextMenu>
+                                            <MenuItem Header="重命名"
+                                                      Command="{Binding #FavoriteList.DataContext.RenameCollectionCommand}"
+                                                      CommandParameter="{Binding}"/>
                                             <MenuItem Header="下载此合集"
                                                       Command="{Binding #FavoriteList.DataContext.DownloadCollectionCommand}"
                                                       CommandParameter="{Binding}"/>

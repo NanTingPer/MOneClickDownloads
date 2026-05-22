@@ -19,11 +19,11 @@
                     x:Name="CreateButton"/>
         </StackPanel>
 
-        <!-- 内容区 -->
-        <StackPanel Spacing="12" VerticalAlignment="Top">
-            <TextBlock Text="请输入收藏夹名称" FontSize="16" FontWeight="Bold"/>
-            <TextBox x:Name="NameTextBox" PlaceholderText="收藏夹名称..."
-                     FontSize="14"/>
-        </StackPanel>
+         <!-- 内容区 -->
+         <StackPanel Spacing="12" VerticalAlignment="Top">
+             <TextBlock x:Name="TitleText" Text="请输入收藏夹名称" FontSize="16" FontWeight="Bold"/>
+             <TextBox x:Name="NameTextBox" PlaceholderText="收藏夹名称..."
+                      FontSize="14"/>
+         </StackPanel>
     </DockPanel>
 </Window>
