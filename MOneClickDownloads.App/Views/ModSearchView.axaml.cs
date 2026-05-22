@@ -110,7 +110,7 @@ namespace MOneClickDownloads.App.Views
             // 添加"创建新收藏夹"子菜单项
             var createItem = new MenuItem
             {
-                Header = "➕ 创建新收藏夹"
+                Header = "+ 创建新收藏夹"
             };
             createItem.Click += async (_, _) =>
             {

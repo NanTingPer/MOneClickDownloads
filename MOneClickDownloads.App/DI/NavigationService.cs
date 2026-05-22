@@ -33,14 +33,16 @@ namespace MOneClickDownloads.App.DI
                 () => _serviceProvider.GetRequiredService<MainWindowViewModel>());
         }
 
+        private ModSearchViewModel? _searchViewModel;
+
         /// <summary>
-        /// 创建搜索页面 ViewModel。
-        /// 从 DI 容器解析 ModSearchViewModel（Transient），注入 INavigationService。
+        /// 创建（或复用缓存的）搜索页面 ViewModel。
+        /// Singleton 生命周期保证搜索状态在页面导航间保留。
         /// </summary>
         /// <returns>搜索页面 ViewModel</returns>
         public ModSearchViewModel CreateSearchViewModel()
         {
-            return _serviceProvider.GetRequiredService<ModSearchViewModel>();
+            return _searchViewModel ??= _serviceProvider.GetRequiredService<ModSearchViewModel>();
         }
 
         /// <summary>

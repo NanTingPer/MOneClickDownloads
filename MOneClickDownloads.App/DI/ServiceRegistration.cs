@@ -60,8 +60,8 @@ namespace MOneClickDownloads.App.DI
             // MainWindowViewModel - Singleton（应用主 VM，管理导航状态）
             services.AddSingleton<MainWindowViewModel>();
 
-            // ModSearchViewModel - Transient（每次导航到搜索页时创建新实例）
-            services.AddTransient<ModSearchViewModel>();
+            // ModSearchViewModel - Singleton（保留搜索状态，避免重复搜索）
+            services.AddSingleton<ModSearchViewModel>();
 
             // FavoritesViewModel - Transient（每次导航到收藏夹页面时创建新实例）
             services.AddTransient<FavoritesViewModel>();
