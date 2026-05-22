@@ -67,7 +67,12 @@ namespace MOneClickDownloads.Service.Analyzers
         }
 
         /// <summary>
-        /// 解析 TOML 内容，提取 [[mods]] 数组中第一个条目的信息。
+        /// 解析 TOML 内容，提取 [[mods]] 数组中第一个条目的信息。<br />
+        /// <br />
+        /// 支持的 mods.toml 格式变体：<br />
+        /// - 标准格式：字段直接在 [[mods]] 下方，tab 缩进<br />
+        /// - TOML 解析成功但模型结构异常时，通过 key 遍历回退查找 TomlArray<br />
+        /// - 所有标准方法均失败时，使用正则表达式兜底提取 modId<br />
         /// </summary>
         /// <param name="tomlContent">TOML 文本内容</param>
         /// <returns>解析结果；若无法解析则返回 null</returns>
@@ -80,34 +85,114 @@ namespace MOneClickDownloads.Service.Analyzers
                 return null;
             }
 
-            var model = document.ToModel();
+            TomlTable model;
+            try
+            {
+                model = document.ToModel();
+            }
+            catch (Exception ex)
+            {
+                Logger.Warning(ex, "TOML 模型转换失败");
+                return null;
+            }
 
-            // mods.toml 使用 [[mods]] 数组语法
+            Logger.Debug("TOML 模型包含 {Count} 个顶级键: {Keys}",
+                model.Count, string.Join(", ", model.Keys));
+
+            // 策略1：标准方式查找 [[mods]] 数组
             if (model.TryGetValue("mods", out var modsObj) && modsObj is TomlArray modsArray && modsArray.Count > 0)
             {
-                var firstMod = modsArray[0];
-                if (firstMod is TomlTable modTable)
+                var result = TryParseFirstMod(modsArray);
+                if (result != null) return result;
+            }
+
+            // 策略2：遍历所有顶级键，查找第一个 TomlArray（回退策略）
+            foreach (var kvp in model)
+            {
+                if (kvp.Value is TomlArray fallbackArray && fallbackArray.Count > 0)
                 {
-                    var modId = GetStringField(modTable, "modId");
-                    var displayName = GetStringField(modTable, "displayName");
-                    var version = GetStringField(modTable, "version");
-
-                    if (string.IsNullOrEmpty(modId))
-                    {
-                        Logger.Warning("mods.toml 中 [[mods]] 缺少 modId 字段");
-                        return null;
-                    }
-
-                    return new ModAnalysisResult
-                    {
-                        ModId = modId,
-                        Name = displayName ?? string.Empty,
-                        Version = version ?? string.Empty
-                    };
+                    Logger.Debug("通过遍历发现数组键: {Key}, 元素数量: {Count}", kvp.Key, fallbackArray.Count);
+                    var result = TryParseFirstMod(fallbackArray);
+                    if (result != null) return result;
                 }
             }
 
-            Logger.Warning("mods.toml 中未找到 [[mods]] 数组或数组为空");
+            // 策略3：正则表达式兜底提取（应对 TOML 解析结果异常的情况）
+            Logger.Debug("TOML 模型方式未找到 [[mods]]，尝试正则表达式兜底提取");
+            var regexResult = TryParseTomlWithRegex(tomlContent);
+            if (regexResult != null) return regexResult;
+
+            // 所有策略均失败，记录诊断信息
+            Logger.Warning("mods.toml 中未找到 [[mods]] 数组或数组为空。TOML 内容前 500 字符: {Content}",
+                tomlContent.Length > 500 ? tomlContent[..500] : tomlContent);
+            return null;
+        }
+
+        /// <summary>
+        /// 尝试从 TomlArray 中解析第一个 mod 的信息。
+        /// </summary>
+        private static ModAnalysisResult? TryParseFirstMod(TomlArray array)
+        {
+            var firstMod = array[0];
+            if (firstMod is TomlTable modTable)
+            {
+                var modId = GetStringField(modTable, "modId");
+                var displayName = GetStringField(modTable, "displayName");
+                var version = GetStringField(modTable, "version");
+
+                if (string.IsNullOrEmpty(modId))
+                {
+                    Logger.Warning("mods.toml 中 [[mods]] 缺少 modId 字段");
+                    return null;
+                }
+
+                Logger.Debug("成功解析 [[mods]]: modId={ModId}, displayName={DisplayName}, version={Version}",
+                    modId, displayName ?? "(null)", version ?? "(null)");
+
+                return new ModAnalysisResult
+                {
+                    ModId = modId,
+                    Name = displayName ?? string.Empty,
+                    Version = version ?? string.Empty
+                };
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// 使用正则表达式从 TOML 原始文本中兜底提取 modId、displayName、version。<br />
+        /// 仅在 TOML 解析模型异常时作为最后手段使用。
+        /// </summary>
+        private static ModAnalysisResult? TryParseTomlWithRegex(string tomlContent)
+        {
+            try
+            {
+                var modIdMatch = System.Text.RegularExpressions.Regex.Match(
+                    tomlContent, @"^\s*modId\s*=\s*""([^""]+)""", System.Text.RegularExpressions.RegexOptions.Multiline);
+                var displayNameMatch = System.Text.RegularExpressions.Regex.Match(
+                    tomlContent, @"^\s*displayName\s*=\s*""([^""]+)""", System.Text.RegularExpressions.RegexOptions.Multiline);
+                var versionMatch = System.Text.RegularExpressions.Regex.Match(
+                    tomlContent, @"^\s*version\s*=\s*""([^""]+)""", System.Text.RegularExpressions.RegexOptions.Multiline);
+
+                if (modIdMatch.Success)
+                {
+                    Logger.Debug("正则兜底成功提取: modId={ModId}, displayName={DisplayName}, version={Version}",
+                        modIdMatch.Groups[1].Value,
+                        displayNameMatch.Success ? displayNameMatch.Groups[1].Value : "(null)",
+                        versionMatch.Success ? versionMatch.Groups[1].Value : "(null)");
+
+                    return new ModAnalysisResult
+                    {
+                        ModId = modIdMatch.Groups[1].Value,
+                        Name = displayNameMatch.Success ? displayNameMatch.Groups[1].Value : string.Empty,
+                        Version = versionMatch.Success ? versionMatch.Groups[1].Value : string.Empty
+                    };
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Warning(ex, "正则表达式兜底解析失败");
+            }
             return null;
         }
 
