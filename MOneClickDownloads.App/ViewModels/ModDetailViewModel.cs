@@ -12,6 +12,7 @@ using Avalonia.Platform.Storage;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MOneClickDownloads.App.Configs;
+using MOneClickDownloads.App.DI;
 using MOneClickDownloads.App.Models;
 using MOneClickDownloads.App.Views;
 using MOneClickDownloads.DataModel.Enums;
@@ -24,7 +25,7 @@ namespace MOneClickDownloads.App.ViewModels
 {
     public partial class ModDetailViewModel : ViewModelBase
     {
-        private readonly MainWindowViewModel _mainVm;
+        private readonly INavigationService _navigation;
         private readonly ModDownloadService _downloadService;
         private readonly ModrinthAPIService _apiService;
         private readonly ConfigService _configService;
@@ -80,12 +81,24 @@ namespace MOneClickDownloads.App.ViewModels
         [ObservableProperty]
         private string? _projectSlug;
 
-        public ModDetailViewModel(MainWindowViewModel mainVm, string projectId, string projectTitle, string projectDescription, string? projectSlug = null)
+        /// <summary>
+        /// 构造模组详情 ViewModel，所有服务依赖通过 DI 容器注入。
+        /// 运行时参数（projectId 等）由 ActivatorUtilities.CreateInstance 传入。
+        /// </summary>
+        /// <param name="navigation">导航服务（DI 注入）</param>
+        /// <param name="downloadService">模组下载服务（DI 注入）</param>
+        /// <param name="apiService">Modrinth API 服务（DI 注入）</param>
+        /// <param name="configService">应用配置服务（DI 注入）</param>
+        /// <param name="projectId">项目ID</param>
+        /// <param name="projectTitle">项目标题</param>
+        /// <param name="projectDescription">项目描述</param>
+        /// <param name="projectSlug">项目 slug</param>
+        public ModDetailViewModel(INavigationService navigation, ModDownloadService downloadService, ModrinthAPIService apiService, ConfigService configService, string projectId, string projectTitle, string projectDescription, string? projectSlug = null)
         {
-            _mainVm = mainVm;
-            _downloadService = mainVm.DownloadService;
-            _apiService = mainVm.ApiService;
-            _configService = mainVm.ConfigService;
+            _navigation = navigation;
+            _downloadService = downloadService;
+            _apiService = apiService;
+            _configService = configService;
             _logger = Log.ForContext<ModDetailViewModel>();
             
             _projectId = projectId;
@@ -453,7 +466,7 @@ namespace MOneClickDownloads.App.ViewModels
                 _logger.Information("取消正在进行的下载");
                 _downloadCts?.Cancel();
             }
-            _mainVm.NavigateToSearch();
+            _navigation.MainViewModel.NavigateToSearch();
         }
     }
 }

@@ -1,6 +1,4 @@
-﻿using System;
-using System.IO;
-using MOneClickDownloads.Service;
+﻿using MOneClickDownloads.App.DI;
 using Serilog;
 
 namespace MOneClickDownloads.App.ViewModels
@@ -9,35 +7,7 @@ namespace MOneClickDownloads.App.ViewModels
     {
         private static readonly ILogger Logger = Log.ForContext<MainWindowViewModel>();
 
-        /// <summary>
-        /// 共享的 Modrinth API 服务实例，注入到子 ViewModel 中复用 HTTP 连接。
-        /// </summary>
-        public ModrinthAPIService ApiService { get; }
-
-        /// <summary>
-        /// 共享的模组搜索服务
-        /// </summary>
-        public ModSearchService SearchService { get; }
-
-        /// <summary>
-        /// 共享的模组下载服务
-        /// </summary>
-        public ModDownloadService DownloadService { get; }
-
-        /// <summary>
-        /// 共享的应用配置服务，提供配置项的持久化读写。
-        /// </summary>
-        public ConfigService ConfigService { get; }
-
-        /// <summary>
-        /// 共享的模组文件分析服务，用于分析 JAR 包提取模组元数据。
-        /// </summary>
-        public IModAnalysisService ModAnalysisService { get; }
-
-        /// <summary>
-        /// 共享的模组冲突检测服务
-        /// </summary>
-        public IModConflictService ConflictService { get; }
+        private readonly INavigationService _navigation;
 
         private ViewModelBase? _currentViewModel;
         /// <summary>
@@ -49,21 +19,18 @@ namespace MOneClickDownloads.App.ViewModels
             set => SetProperty(ref _currentViewModel, value);
         }
 
-        public MainWindowViewModel()
+        /// <summary>
+        /// 构造 MainWindowViewModel，通过导航服务协调页面创建。
+        /// <br />
+        /// 注意：初始导航由 App.axaml.cs 在容器构建完成后触发，不在构造函数中调用，
+        /// 以避免 DI 容器解析期间的循环依赖问题。
+        /// </summary>
+        /// <param name="navigation">导航服务（DI 注入）</param>
+        public MainWindowViewModel(INavigationService navigation)
         {
             Logger.Information("MainWindowViewModel 初始化开始");
 
-            ApiService = new ModrinthAPIService();
-            SearchService = new ModSearchService(ApiService);
-
-            var configPath = Path.Combine(AppContext.BaseDirectory, "configs", "app.json");
-            ConfigService = new ConfigService(configPath);
-            ModAnalysisService = new ModAnalysisService();
-            ConflictService = new ModConflictService();
-            DownloadService = new ModDownloadService(ApiService, ModAnalysisService, ConflictService);
-
-            // 默认显示搜索页
-            NavigateToSearch();
+            _navigation = navigation;
 
             Logger.Information("MainWindowViewModel 初始化完成");
         }
@@ -74,7 +41,7 @@ namespace MOneClickDownloads.App.ViewModels
         public void NavigateToSearch()
         {
             Logger.Information("导航到搜索页面");
-            CurrentViewModel = new ModSearchViewModel(this);
+            CurrentViewModel = _navigation.CreateSearchViewModel();
         }
 
         /// <summary>
@@ -87,7 +54,7 @@ namespace MOneClickDownloads.App.ViewModels
         public void NavigateToDetail(string projectId, string projectTitle, string projectDescription, string? projectSlug = null)
         {
             Logger.Information("导航到模组详情页面: ProjectId={ProjectId}, Title={Title}, Slug={Slug}", projectId, projectTitle, projectSlug ?? "null");
-            CurrentViewModel = new ModDetailViewModel(this, projectId, projectTitle, projectDescription, projectSlug);
+            CurrentViewModel = _navigation.CreateDetailViewModel(projectId, projectTitle, projectDescription, projectSlug);
         }
     }
 }

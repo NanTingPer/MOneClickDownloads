@@ -5,9 +5,7 @@
              RequestedThemeVariant="Default">
              <!-- "Default" ThemeVariant follows system theme variant. "Dark" or "Light" are other available options. -->
 
-    <Application.DataTemplates>
-        <local:ViewLocator/>
-    </Application.DataTemplates>
+    <!-- ViewLocator 在 App.axaml.cs 中通过代码动态添加，以支持依赖注入 -->
   
     <Application.Styles>
         <FluentTheme />

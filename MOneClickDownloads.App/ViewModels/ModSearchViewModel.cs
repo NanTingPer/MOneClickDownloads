@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using MOneClickDownloads.App.DI;
 using MOneClickDownloads.DataModel.Search;
 using MOneClickDownloads.Service;
 using Serilog;
@@ -12,7 +13,7 @@ namespace MOneClickDownloads.App.ViewModels
 {
     public partial class ModSearchViewModel : ViewModelBase
     {
-        private readonly MainWindowViewModel _mainVm;
+        private readonly INavigationService _navigation;
         private readonly ModSearchService _searchService;
         private readonly ILogger _logger;
 
@@ -31,10 +32,15 @@ namespace MOneClickDownloads.App.ViewModels
         [ObservableProperty]
         private string _statusMessage = string.Empty;
 
-        public ModSearchViewModel(MainWindowViewModel mainVm)
+        /// <summary>
+        /// 构造搜索页面 ViewModel，所有依赖通过 DI 容器注入。
+        /// </summary>
+        /// <param name="navigation">导航服务（DI 注入）</param>
+        /// <param name="searchService">模组搜索服务（DI 注入）</param>
+        public ModSearchViewModel(INavigationService navigation, ModSearchService searchService)
         {
-            _mainVm = mainVm;
-            _searchService = mainVm.SearchService;
+            _navigation = navigation;
+            _searchService = searchService;
             _logger = Log.ForContext<ModSearchViewModel>();
             _logger.Information("ModSearchViewModel 初始化完成");
         }
@@ -79,7 +85,7 @@ namespace MOneClickDownloads.App.ViewModels
         {
             if (hit == null) return;
             _logger.Information("用户选择模组: ProjectId={ProjectId}, Title={Title}", hit.ProjectId, hit.Title);
-            _mainVm.NavigateToDetail(hit.ProjectId, hit.Title, hit.Description, hit.Slug);
+            _navigation.MainViewModel.NavigateToDetail(hit.ProjectId, hit.Title, hit.Description, hit.Slug);
         }
     }
 }
