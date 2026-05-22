@@ -11,6 +11,7 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Platform.Storage;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using MOneClickDownloads.App.Configs;
 using MOneClickDownloads.App.Models;
 using MOneClickDownloads.DataModel.Enums;
 using MOneClickDownloads.DataModel.Version;
@@ -25,6 +26,7 @@ namespace MOneClickDownloads.App.ViewModels
         private readonly MainWindowViewModel _mainVm;
         private readonly ModDownloadService _downloadService;
         private readonly ModrinthAPIService _apiService;
+        private readonly ConfigService _configService;
         private readonly ILogger _logger;
 
         [ObservableProperty]
@@ -79,6 +81,7 @@ namespace MOneClickDownloads.App.ViewModels
             _mainVm = mainVm;
             _downloadService = mainVm.DownloadService;
             _apiService = mainVm.ApiService;
+            _configService = mainVm.ConfigService;
             _logger = Log.ForContext<ModDetailViewModel>();
             
             _projectId = projectId;
@@ -183,8 +186,20 @@ namespace MOneClickDownloads.App.ViewModels
             AvailableStatusFilters.Add("预览");
 
             ActiveLoaderFilter = null;
-            ActiveMcVersionFilter = null;
             ActiveStatusFilter = "全部";
+
+            // 从配置中恢复 MC 版本过滤器
+            var savedMcVersion = _configService.Get<string>(ConfigKeys.ActiveMcVersionFilter);
+            if (!string.IsNullOrEmpty(savedMcVersion) && mcVersions.Contains(savedMcVersion))
+            {
+                ActiveMcVersionFilter = savedMcVersion;
+                _logger.Information("从配置恢复 MC 版本过滤器: {McVersion}", savedMcVersion);
+            }
+            else
+            {
+                ActiveMcVersionFilter = null;
+            }
+
             ApplyFilters();
 
             _logger.Debug("版本分组完成: 共 {GroupCount} 个版本组，可用加载器: {Loaders}", sortedGroups.Count, string.Join(", ", loaders));
@@ -224,6 +239,17 @@ namespace MOneClickDownloads.App.ViewModels
             {
                 ActiveMcVersionFilter = mcVersion;
             }
+
+            // 持久化 MC 版本过滤器
+            if (string.IsNullOrEmpty(ActiveMcVersionFilter))
+            {
+                _configService.Remove(ConfigKeys.ActiveMcVersionFilter);
+            }
+            else
+            {
+                _configService.Set(ConfigKeys.ActiveMcVersionFilter, ActiveMcVersionFilter);
+            }
+
             ApplyFilters();
             _logger.Information("MC版本过滤切换: ActiveFilter={Filter}", ActiveMcVersionFilter ?? "(无)");
         }

@@ -1,4 +1,6 @@
-﻿using MOneClickDownloads.Service;
+﻿using System;
+using System.IO;
+using MOneClickDownloads.Service;
 using Serilog;
 
 namespace MOneClickDownloads.App.ViewModels
@@ -22,6 +24,11 @@ namespace MOneClickDownloads.App.ViewModels
         /// </summary>
         public ModDownloadService DownloadService { get; }
 
+        /// <summary>
+        /// 共享的应用配置服务，提供配置项的持久化读写。
+        /// </summary>
+        public ConfigService ConfigService { get; }
+
         private ViewModelBase? _currentViewModel;
         /// <summary>
         /// 当前显示的子页面 ViewModel，通过 ViewLocator 自动匹配 View。
@@ -39,6 +46,9 @@ namespace MOneClickDownloads.App.ViewModels
             ApiService = new ModrinthAPIService();
             SearchService = new ModSearchService(ApiService);
             DownloadService = new ModDownloadService(ApiService);
+
+            var configPath = Path.Combine(AppContext.BaseDirectory, "configs", "app.json");
+            ConfigService = new ConfigService(configPath);
 
             // 默认显示搜索页
             NavigateToSearch();
