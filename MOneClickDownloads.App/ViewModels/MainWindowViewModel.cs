@@ -29,6 +29,11 @@ namespace MOneClickDownloads.App.ViewModels
         /// </summary>
         public ConfigService ConfigService { get; }
 
+        /// <summary>
+        /// 共享的模组文件分析服务，用于分析 JAR 包提取模组元数据。
+        /// </summary>
+        public IModAnalysisService ModAnalysisService { get; }
+
         private ViewModelBase? _currentViewModel;
         /// <summary>
         /// 当前显示的子页面 ViewModel，通过 ViewLocator 自动匹配 View。
@@ -49,6 +54,7 @@ namespace MOneClickDownloads.App.ViewModels
 
             var configPath = Path.Combine(AppContext.BaseDirectory, "configs", "app.json");
             ConfigService = new ConfigService(configPath);
+            ModAnalysisService = new ModAnalysisService();
 
             // 默认显示搜索页
             NavigateToSearch();

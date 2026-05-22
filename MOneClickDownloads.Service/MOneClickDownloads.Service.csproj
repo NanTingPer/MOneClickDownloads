@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <PackageReference Include="Serilog" Version="4.2.0" />
+    <PackageReference Include="Tomlyn" Version="0.18.0" />
   </ItemGroup>
 
   <ItemGroup>

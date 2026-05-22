@@ -10,6 +10,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\MOneClickDownloads.DataModel\MOneClickDownloads.DataModel.csproj" />
+    <ProjectReference Include="..\MOneClickDownloads.Service\MOneClickDownloads.Service.csproj" />
   </ItemGroup>
 
 </Project>
