@@ -1,3 +1,4 @@
+using MOneClickDownloads.DataModel.Enums;
 using MOneClickDownloads.DataModel.Version;
 
 namespace MOneClickDownloads.App.Models
@@ -23,6 +24,11 @@ namespace MOneClickDownloads.App.Models
         public string VersionTypeText { get; set; } = string.Empty;
 
         /// <summary>
+        /// 发布状态标签文本：[发布] 或 [预览]
+        /// </summary>
+        public string DisplayTypeTag { get; set; } = string.Empty;
+
+        /// <summary>
         /// 支持的加载器文本（如 "fabric, quilt"）
         /// </summary>
         public string LoadersText { get; set; } = string.Empty;
@@ -36,5 +42,13 @@ namespace MOneClickDownloads.App.Models
         /// 发布日期文本
         /// </summary>
         public string DatePublishedText { get; set; } = string.Empty;
+
+        /// <summary>
+        /// 根据版本类型计算发布状态标签
+        /// </summary>
+        public static string GetTypeTag(VersionType versionType)
+        {
+            return versionType == VersionType.Release ? "[发布]" : "[预览]";
+        }
     }
 }

@@ -48,6 +48,18 @@ namespace MOneClickDownloads.App.ViewModels
         [ObservableProperty]
         private string? _activeLoaderFilter;
 
+        [ObservableProperty]
+        private ObservableCollection<string> _availableMcVersions = new();
+
+        [ObservableProperty]
+        private string? _activeMcVersionFilter;
+
+        [ObservableProperty]
+        private ObservableCollection<string> _availableStatusFilters = new();
+
+        [ObservableProperty]
+        private string? _activeStatusFilter;
+
         private List<McVersionGroup> _allVersionGroups = new();
 
         [ObservableProperty]
@@ -110,25 +122,18 @@ namespace MOneClickDownloads.App.ViewModels
             {
                 foreach (var gv in ver.GameVersions)
                 {
-                    // 提取大版本号 (e.g. "1.20.1" -> "1.20")
-                    var parts = gv.Split('.');
-                    if (parts.Length < 2) continue;
-                    var majorVersion = $"{parts[0]}.{parts[1]}";
+                    if (!groups.ContainsKey(gv))
+                        groups[gv] = new List<ModVersionItem>();
 
-                    if (!groups.ContainsKey(majorVersion))
-                        groups[majorVersion] = new List<ModVersionItem>();
-
-                    // 避免同一个版本在一个大版本组内重复（如果它支持多个子版本）
-                    // 但我们这里按 Version ID 去重比较合理，因为同一个 ModVersion 对应多个子游戏版本
-                    // 不过上面是双层循环，所以同一个 ver 对象可能会被加入多次 majorVersion 组，这是预期的。
-                    // 但在同一个 majorVersion 组内，同一个 ver.Id 不应该重复出现。
-                    if (!groups[majorVersion].Any(x => x.Version.Id == ver.Id))
+                    // 避免同一个版本在同一个游戏版本组内重复
+                    if (!groups[gv].Any(x => x.Version.Id == ver.Id))
                     {
-                        groups[majorVersion].Add(new ModVersionItem
+                        groups[gv].Add(new ModVersionItem
                         {
                             Version = ver,
                             DisplayName = string.IsNullOrEmpty(ver.Name) ? ver.VersionNumber : ver.Name,
                             VersionTypeText = ver.VersionType.ToString(),
+                            DisplayTypeTag = ModVersionItem.GetTypeTag(ver.VersionType),
                             LoadersText = string.Join(", ", ver.Loaders),
                             GameVersionsText = string.Join(", ", ver.GameVersions),
                             DatePublishedText = ver.DatePublished.ToString("yyyy-MM-dd")
@@ -137,9 +142,9 @@ namespace MOneClickDownloads.App.ViewModels
                 }
             }
 
-            // 排序
+            // 按版本号排序（降序），自定义版本号比较器
             var sortedGroups = groups
-                .OrderByDescending(g => g.Key) // Major Version 降序
+                .OrderByDescending(g => g.Key, new McVersionComparer())
                 .Select(g => new McVersionGroup
                 {
                     MajorVersion = g.Key,
@@ -161,10 +166,28 @@ namespace MOneClickDownloads.App.ViewModels
                 AvailableLoaders.Add(loader);
             }
 
-            ActiveLoaderFilter = null;
-            ApplyLoaderFilter();
+            // 提取所有不重复的 MC 版本（降序）
+            var mcVersions = groups.Keys
+                .OrderByDescending(v => v, new McVersionComparer())
+                .ToList();
+            AvailableMcVersions.Clear();
+            foreach (var mcVer in mcVersions)
+            {
+                AvailableMcVersions.Add(mcVer);
+            }
 
-            _logger.Debug("版本分组完成: 共 {GroupCount} 个大版本组，可用加载器: {Loaders}", sortedGroups.Count, string.Join(", ", loaders));
+            // 初始化发布状态过滤选项
+            AvailableStatusFilters.Clear();
+            AvailableStatusFilters.Add("全部");
+            AvailableStatusFilters.Add("发布");
+            AvailableStatusFilters.Add("预览");
+
+            ActiveLoaderFilter = null;
+            ActiveMcVersionFilter = null;
+            ActiveStatusFilter = "全部";
+            ApplyFilters();
+
+            _logger.Debug("版本分组完成: 共 {GroupCount} 个版本组，可用加载器: {Loaders}", sortedGroups.Count, string.Join(", ", loaders));
         }
 
         [RelayCommand]
@@ -182,37 +205,84 @@ namespace MOneClickDownloads.App.ViewModels
             {
                 ActiveLoaderFilter = loader;
             }
-            ApplyLoaderFilter();
+            ApplyFilters();
             _logger.Information("加载器过滤切换: ActiveFilter={Filter}", ActiveLoaderFilter ?? "(无)");
         }
 
-        private void ApplyLoaderFilter()
+        [RelayCommand]
+        private void ToggleMcVersionFilter(string? mcVersion)
         {
-            VersionGroups.Clear();
-
-            var source = _allVersionGroups;
-            if (!string.IsNullOrEmpty(ActiveLoaderFilter))
+            if (string.IsNullOrEmpty(mcVersion))
             {
-                foreach (var group in source)
-                {
-                    var filtered = group.Versions
-                        .Where(v => v.Version.Loaders.Contains(ActiveLoaderFilter, StringComparer.OrdinalIgnoreCase))
-                        .ToList();
-                    if (filtered.Count > 0)
-                    {
-                        VersionGroups.Add(new McVersionGroup
-                        {
-                            MajorVersion = group.MajorVersion,
-                            Versions = filtered
-                        });
-                    }
-                }
+                ActiveMcVersionFilter = null;
+            }
+            else if (ActiveMcVersionFilter == mcVersion)
+            {
+                ActiveMcVersionFilter = null;
             }
             else
             {
-                foreach (var group in source)
+                ActiveMcVersionFilter = mcVersion;
+            }
+            ApplyFilters();
+            _logger.Information("MC版本过滤切换: ActiveFilter={Filter}", ActiveMcVersionFilter ?? "(无)");
+        }
+
+        [RelayCommand]
+        private void ToggleStatusFilter(string? status)
+        {
+            if (string.IsNullOrEmpty(status) || status == "全部")
+            {
+                ActiveStatusFilter = "全部";
+            }
+            else if (ActiveStatusFilter == status)
+            {
+                ActiveStatusFilter = "全部";
+            }
+            else
+            {
+                ActiveStatusFilter = status;
+            }
+            ApplyFilters();
+            _logger.Information("发布状态过滤切换: ActiveFilter={Filter}", ActiveStatusFilter ?? "(全部)");
+        }
+
+        private void ApplyFilters()
+        {
+            VersionGroups.Clear();
+
+            foreach (var group in _allVersionGroups)
+            {
+                var filtered = group.Versions.AsEnumerable();
+
+                // 应用 Loader 过滤
+                if (!string.IsNullOrEmpty(ActiveLoaderFilter))
                 {
-                    VersionGroups.Add(group);
+                    filtered = filtered.Where(v => v.Version.Loaders.Contains(ActiveLoaderFilter, StringComparer.OrdinalIgnoreCase));
+                }
+
+                // 应用 MC 版本过滤
+                if (!string.IsNullOrEmpty(ActiveMcVersionFilter))
+                {
+                    filtered = filtered.Where(v => v.Version.GameVersions.Contains(ActiveMcVersionFilter));
+                }
+
+                // 应用发布状态过滤
+                if (!string.IsNullOrEmpty(ActiveStatusFilter) && ActiveStatusFilter != "全部")
+                {
+                    filtered = ActiveStatusFilter == "发布"
+                        ? filtered.Where(v => v.Version.VersionType == VersionType.Release)
+                        : filtered.Where(v => v.Version.VersionType != VersionType.Release);
+                }
+
+                var filteredList = filtered.ToList();
+                if (filteredList.Count > 0)
+                {
+                    VersionGroups.Add(new McVersionGroup
+                    {
+                        MajorVersion = group.MajorVersion,
+                        Versions = filteredList
+                    });
                 }
             }
         }

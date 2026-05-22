@@ -98,4 +98,20 @@
     <Style Selector="Border.inline-block">
         <Setter Property="HorizontalAlignment" Value="Left"/>
     </Style>
+
+    <!-- Directional Margin -->
+    <Style Selector="Button.mr-2">
+        <Setter Property="Margin" Value="0,0,8,0"/>
+    </Style>
+    <Style Selector="Button.mb-2">
+        <Setter Property="Margin" Value="0,0,0,8"/>
+    </Style>
+    <Style Selector="Button.mr-2.mb-2">
+        <Setter Property="Margin" Value="0,0,8,8"/>
+    </Style>
+
+    <!-- Border Sides -->
+    <Style Selector="Border.border-b">
+        <Setter Property="BorderThickness" Value="0,0,0,1"/>
+    </Style>
 </Styles>
