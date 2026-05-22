@@ -87,6 +87,7 @@ namespace MOneClickDownloads.App.ViewModels
                         Item = item,
                         DisplayName = item.Title,
                         DisplayDescription = item.Description,
+                        IconUrl = item.IconUrl,
                         DisplayTypeTag = FavoriteDisplayItem.GetTypeTag(item.ProjectType),
                         ProjectType = item.ProjectType,
                         FormattedDownloads = FavoriteDisplayItem.FormatDownloads(item.Downloads),

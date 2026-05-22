@@ -26,6 +26,11 @@ namespace MOneClickDownloads.App.Models
         public string DisplayDescription { get; set; } = string.Empty;
 
         /// <summary>
+        /// 项目图标URL，可能为null
+        /// </summary>
+        public string? IconUrl { get; set; }
+
+        /// <summary>
         /// 项目类型标签文本（mod / modpack / resourcepack / shader）
         /// </summary>
         public string DisplayTypeTag { get; set; } = string.Empty;

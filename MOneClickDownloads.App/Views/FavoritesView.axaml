@@ -123,9 +123,19 @@
                                                             HorizontalContentAlignment="Stretch"
                                                             Command="{Binding #FavoriteList.DataContext.NavigateToDetailCommand}"
                                                             CommandParameter="{Binding}">
-                                                        <Grid ColumnDefinitions="Auto,*">
-                                                            <!-- 左侧：类型标签 Badge -->
+                                                        <Grid ColumnDefinitions="Auto,Auto,*">
+                                                            <!-- 左侧：模组图标 -->
                                                             <Border Grid.Column="0"
+                                                                    Width="40" Height="40"
+                                                                    CornerRadius="4"
+                                                                    ClipToBounds="True"
+                                                                    Margin="0,0,8,0">
+                                                                <conv:AsyncImage Url="{Binding IconUrl}"
+                                                                                 Width="40" Height="40"
+                                                                                 Stretch="Uniform"/>
+                                                            </Border>
+                                                            <!-- 类型标签 Badge -->
+                                                            <!-- <Border Grid.Column="1"
                                                                     CornerRadius="4"
                                                                     Padding="6,2"
                                                                     Background="{Binding ProjectType, 
@@ -133,9 +143,9 @@
                                                                 <TextBlock Text="{Binding DisplayTypeTag}"
                                                                            FontSize="13"
                                                                            FontWeight="SemiBold"/>
-                                                            </Border>
+                                                            </Border> -->
                                                             <!-- 右侧：文本信息 -->
-                                                            <StackPanel Grid.Column="1" 
+                                                            <StackPanel Grid.Column="2" 
                                                                         Margin="8,0,0,0"
                                                                         Spacing="2">
                                                                 <!-- 主行：模组名 -->
