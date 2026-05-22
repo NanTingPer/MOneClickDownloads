@@ -50,7 +50,14 @@
                                 Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
                                 CornerRadius="8"
                                 BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
-                                BorderThickness="1">
+                                BorderThickness="1"
+                                PointerPressed="OnSearchResultPointerPressed"
+                                ContextRequested="OnSearchResultContextRequested">
+                                <Border.ContextMenu>
+                                    <ContextMenu Opened="OnContextMenuOpened">
+                                        <MenuItem Header="添加到收藏夹"/>
+                                    </ContextMenu>
+                                </Border.ContextMenu>
                             <StackPanel Spacing="4" Orientation="Vertical">
                                 <!-- 标题行 -->
                                 <StackPanel Orientation="Horizontal" Spacing="8">
