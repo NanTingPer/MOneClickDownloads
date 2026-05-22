@@ -14,33 +14,37 @@ namespace MOneClickDownloads.DataModel.Mod
     /// - Fabric/Quilt: fabric.mod.json（id, name, version）<br />
     /// - Forge: META-INF/mods.toml（modId, displayName, version）<br />
     /// - NeoForge: META-INF/neoforge.mods.toml（modId, displayName, version）<br />
+    /// - Legacy Forge: mcmod.info（modid, name, version，1.12.2 及更早版本）<br />
     /// </summary>
     public class ModAnalysisResult
     {
         /// <summary>
         /// 模组的唯一标识符（如 "fabric-api", "xaerominimap"）。
         /// 
-        /// 来源字段：
-        /// - Fabric/Quilt: fabric.mod.json → id
-        /// - Forge/NeoForge: mods.toml / neoforge.mods.toml → modId
+    /// 来源字段：
+    /// - Fabric/Quilt: fabric.mod.json → id
+    /// - Forge/NeoForge: mods.toml / neoforge.mods.toml → modId
+    /// - Legacy Forge: mcmod.info → modid
         /// </summary>
         public string ModId { get; set; } = string.Empty;
 
         /// <summary>
         /// 模组的显示名称（如 "Fabric API", "Xaero's Minimap"）。
         /// 
-        /// 来源字段：
-        /// - Fabric/Quilt: fabric.mod.json → name
-        /// - Forge/NeoForge: mods.toml / neoforge.mods.toml → displayName
+    /// 来源字段：
+    /// - Fabric/Quilt: fabric.mod.json → name
+    /// - Forge/NeoForge: mods.toml / neoforge.mods.toml → displayName
+    /// - Legacy Forge: mcmod.info → name
         /// </summary>
         public string Name { get; set; } = string.Empty;
 
         /// <summary>
         /// 模组版本号（如 "0.147.0+26.2", "25.3.12"）。
         /// 
-        /// 来源字段：
-        /// - Fabric/Quilt: fabric.mod.json → version
-        /// - Forge/NeoForge: mods.toml / neoforge.mods.toml → version
+    /// 来源字段：
+    /// - Fabric/Quilt: fabric.mod.json → version
+    /// - Forge/NeoForge: mods.toml / neoforge.mods.toml → version
+    /// - Legacy Forge: mcmod.info → version
         /// </summary>
         public string Version { get; set; } = string.Empty;
 

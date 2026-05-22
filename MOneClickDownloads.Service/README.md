@@ -21,10 +21,21 @@ MOneClickDownloads.Service/
 ├── MOneClickDownloads.Service.csproj       # 项目文件（net10.0）
 ├── ModrinthAPIService.cs                   # Modrinth API 封装服务
 ├── ModSearchService.cs                     # 模组搜索服务
-├── ModDownloadService.cs                   # 模组下载服务（含 DownloadException）
+├── ModDownloadService.cs                   # 模组下载服务（含冲突检测、DownloadException）
+├── ModAnalysisService.cs                   # 模组文件分析服务
+├── IModAnalysisService.cs                  # 模组分析服务接口
+├── LocalModInventory.cs                    # 本地模组清单工具
+├── ConfigService.cs                        # 应用配置服务
+├── 模组下载流程.md                          # 下载流程详细文档
+├── Analyzers/
+│   ├── IModFileAnalyzer.cs                 # 模组文件分析器接口
+│   ├── FabricModAnalyzer.cs                # Fabric/Quilt 分析器
+│   ├── ForgeModAnalyzer.cs                 # Forge 分析器
+│   └── NeoForgeModAnalyzer.cs              # NeoForge 分析器
 └── Models/
     ├── DownloadProgress.cs                 # 下载进度模型
-    └── DownloadResult.cs                   # 下载结果模型
+    ├── DownloadResult.cs                   # 下载结果模型
+    └── ModConflictInfo.cs                  # 模组冲突信息模型
 ```
 
 ## 核心服务
@@ -245,6 +256,78 @@ foreach (var r in results)
 ```
 
 推荐在应用中创建一个 `ModrinthAPIService` 实例，注入到 `ModSearchService` 和 `ModDownloadService` 中复用 HTTP 连接。
+
+### LocalModInventory
+
+本地模组清单工具，扫描指定文件夹中的所有 JAR 文件并构建已安装模组的索引，用于下载前的冲突检测。
+
+**职责：**
+- 扫描指定文件夹内的所有 `.jar` 文件
+- 使用 `IModAnalysisService` 分析每个 JAR 包的模组元数据
+- 提供按模组 ID 查询已安装模组的能力
+- 提供已安装模组文件路径查询能力
+
+**构造函数：**
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `folderPath` | `string` | 要扫描的模组文件夹路径 |
+| `analysisService` | `IModAnalysisService` | 模组文件分析服务 |
+
+**提供的 API 方法：**
+
+| 方法 | 说明 |
+|------|------|
+| `ScanAsync()` | 扫描文件夹内所有 `.jar` 文件，构建索引 |
+| `FindByModId(modId)` | 按模组 ID 查找已安装的模组（忽略大小写） |
+| `GetModFilePath(modId)` | 获取已安装模组文件的完整路径 |
+| `ContainsMod(modId)` | 检查指定模组 ID 是否已安装 |
+| `InstalledMods` | 获取扫描后的已安装模组列表 |
+| `Count` | 已安装模组数量 |
+
+**使用示例：**
+
+```csharp
+var analysisService = new ModAnalysisService();
+var inventory = new LocalModInventory(@"C:\mods", analysisService);
+await inventory.ScanAsync();
+
+Console.WriteLine($"已安装 {inventory.Count} 个模组");
+
+foreach (var mod in inventory.InstalledMods)
+    Console.WriteLine($"  {mod.Name} v{mod.Version} ({mod.LoaderType})");
+
+var existing = inventory.FindByModId("fabric-api");
+if (existing != null)
+    Console.WriteLine($"已安装: {existing.Name} v{existing.Version}");
+```
+
+### ModConflictCallback（冲突回调委托）
+
+当下载前检测到本地已有同ID模组时调用的回调委托。
+
+```csharp
+public delegate Task<ModConflictResolution> ModConflictCallback(ModConflictInfo conflictInfo);
+```
+
+**冲突类型（ModConflictType）：**
+
+| 类型 | 说明 |
+|------|------|
+| `None` | 无冲突 |
+| `SameModExists` | 完全相同的模组ID和版本已存在 |
+| `HigherVersionExists` | 本地已有更高版本 |
+| `LowerVersionExists` | 本地已有更低版本（可升级） |
+
+**解决策略（ModConflictResolution）：**
+
+| 策略 | 说明 |
+|------|------|
+| `Skip` | 跳过，不下载新版本 |
+| `Replace` | 删除本地旧文件，下载新版本 |
+| `KeepBoth` | 保留两者，新文件以 `文件名-版本号.jar` 格式保存 |
+
+详细的冲突检测流程、版本比较规则和事务机制请参见 [模组下载流程.md](模组下载流程.md)。
 
 ## 技术说明
 

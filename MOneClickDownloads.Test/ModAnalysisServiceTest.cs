@@ -206,7 +206,171 @@ namespace MOneClickDownloads.Test
 
         #endregion
 
+        #region Legacy Forge 分析器测试（mcmod.info）
+
+        [TestMethod]
+        public async Task AnalyzeAsync_LegacyForgeMod_ReturnsCorrectResult()
+        {
+            // Arrange: 创建包含 mcmod.info 的测试 JAR
+            var jarPath = CreateTestJar(entries: new Dictionary<string, string>
+            {
+                ["mcmod.info"] = """
+                [
+                    {
+                        "logoFile": "",
+                        "credits": "",
+                        "authorList": ["Xaero96"],
+                        "updateUrl": "",
+                        "name": "Xaero's Minimap",
+                        "description": "The most \"vanilla-looking\" minimap for Minecraft.",
+                        "version": "25.3.13",
+                        "modid": "xaerominimap",
+                        "mcversion": "1.12.2",
+                        "url": "",
+                        "screenshots": [],
+                        "dependencies": []
+                    }
+                ]
+                """
+            });
+
+            try
+            {
+                // Act
+                var result = await _service.AnalyzeAsync(jarPath);
+
+                // Assert
+                Assert.IsNotNull(result);
+                Assert.AreEqual("xaerominimap", result.ModId);
+                Assert.AreEqual("Xaero's Minimap", result.Name);
+                Assert.AreEqual("25.3.13", result.Version);
+                Assert.AreEqual(ModLoaderType.Forge, result.LoaderType);
+            }
+            finally
+            {
+                CleanupFile(jarPath);
+            }
+        }
+
+        [TestMethod]
+        public async Task AnalyzeAsync_LegacyForgeMod_MissingModId_ReturnsNull()
+        {
+            // Arrange: mcmod.info 缺少 modid 字段
+            var jarPath = CreateTestJar(entries: new Dictionary<string, string>
+            {
+                ["mcmod.info"] = """
+                [
+                    {
+                        "name": "Some Mod",
+                        "version": "1.0.0"
+                    }
+                ]
+                """
+            });
+
+            try
+            {
+                // Act
+                var result = await _service.AnalyzeAsync(jarPath);
+
+                // Assert
+                Assert.IsNull(result);
+            }
+            finally
+            {
+                CleanupFile(jarPath);
+            }
+        }
+
+        [TestMethod]
+        public async Task AnalyzeAsync_LegacyForgeMod_EmptyArray_ReturnsNull()
+        {
+            // Arrange: mcmod.info 是空数组
+            var jarPath = CreateTestJar(entries: new Dictionary<string, string>
+            {
+                ["mcmod.info"] = "[]"
+            });
+
+            try
+            {
+                // Act
+                var result = await _service.AnalyzeAsync(jarPath);
+
+                // Assert
+                Assert.IsNull(result);
+            }
+            finally
+            {
+                CleanupFile(jarPath);
+            }
+        }
+
+        [TestMethod]
+        public async Task AnalyzeAsync_LegacyForgeMod_InvalidJson_ReturnsNull()
+        {
+            // Arrange: mcmod.info 内容不是有效 JSON
+            var jarPath = CreateTestJar(entries: new Dictionary<string, string>
+            {
+                ["mcmod.info"] = "not valid json"
+            });
+
+            try
+            {
+                // Act
+                var result = await _service.AnalyzeAsync(jarPath);
+
+                // Assert
+                Assert.IsNull(result);
+            }
+            finally
+            {
+                CleanupFile(jarPath);
+            }
+        }
+
+        #endregion
+
         #region 优先级和边界测试
+
+        [TestMethod]
+        public async Task AnalyzeAsync_BothForgeAndLegacyForge_ReturnsModernForge()
+        {
+            // Arrange: JAR 同时包含 mods.toml 和 mcmod.info
+            var jarPath = CreateTestJar(entries: new Dictionary<string, string>
+            {
+                ["META-INF/mods.toml"] = """
+                [[mods]]
+                modId = "modern-forge-mod"
+                version = "2.0.0"
+                displayName = "Modern Forge Mod"
+                """,
+                ["mcmod.info"] = """
+                [
+                    {
+                        "modid": "legacy-forge-mod",
+                        "name": "Legacy Forge Mod",
+                        "version": "1.0.0"
+                    }
+                ]
+                """
+            });
+
+            try
+            {
+                // Act
+                var result = await _service.AnalyzeAsync(jarPath);
+
+                // Assert: 现代 Forge 优先于 Legacy Forge
+                Assert.IsNotNull(result);
+                Assert.AreEqual(ModLoaderType.Forge, result.LoaderType);
+                Assert.AreEqual("modern-forge-mod", result.ModId);
+                Assert.AreEqual("Modern Forge Mod", result.Name);
+            }
+            finally
+            {
+                CleanupFile(jarPath);
+            }
+        }
 
         [TestMethod]
         public async Task AnalyzeAsync_BothNeoForgeAndForge_ReturnsNeoForge()

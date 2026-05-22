@@ -50,11 +50,11 @@ namespace MOneClickDownloads.App.ViewModels
 
             ApiService = new ModrinthAPIService();
             SearchService = new ModSearchService(ApiService);
-            DownloadService = new ModDownloadService(ApiService);
 
             var configPath = Path.Combine(AppContext.BaseDirectory, "configs", "app.json");
             ConfigService = new ConfigService(configPath);
             ModAnalysisService = new ModAnalysisService();
+            DownloadService = new ModDownloadService(ApiService, ModAnalysisService);
 
             // 默认显示搜索页
             NavigateToSearch();

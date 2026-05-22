@@ -18,6 +18,7 @@ namespace MOneClickDownloads.Service.Analyzers
     /// - FabricModAnalyzer：解析 fabric.mod.json（同时覆盖 Quilt）<br />
     /// - ForgeModAnalyzer：解析 META-INF/mods.toml<br />
     /// - NeoForgeModAnalyzer：解析 META-INF/neoforge.mods.toml<br />
+    /// - LegacyForgeModAnalyzer：解析 mcmod.info（1.12.2 及更早版本）<br />
     /// </summary>
     internal interface IModFileAnalyzer
     {

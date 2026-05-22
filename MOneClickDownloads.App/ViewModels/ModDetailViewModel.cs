@@ -13,6 +13,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MOneClickDownloads.App.Configs;
 using MOneClickDownloads.App.Models;
+using MOneClickDownloads.App.Views;
 using MOneClickDownloads.DataModel.Enums;
 using MOneClickDownloads.DataModel.Version;
 using MOneClickDownloads.Service;
@@ -367,6 +368,34 @@ namespace MOneClickDownloads.App.ViewModels
 
                 var stopwatch = Stopwatch.StartNew();
 
+                // 构建冲突回调：弹出对话框让用户选择处理方式
+                ModConflictCallback conflictCallback = async (conflictInfo) =>
+                {
+                    _logger.Information("弹出冲突对话框: ModId={ModId}, ConflictType={Type}",
+                        conflictInfo.ModId, conflictInfo.ConflictType);
+
+                    // 在 UI 线程上显示对话框
+                    var resolution = await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
+                    {
+                        var desktop = Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime;
+                        var mainWindow = desktop?.MainWindow;
+                        if (mainWindow == null)
+                        {
+                            _logger.Warning("无法获取主窗口，使用默认 Skip 策略");
+                            return ModConflictResolution.Skip;
+                        }
+
+                        var dialog = new ModConflictDialog();
+                        dialog.SetConflictInfo(conflictInfo);
+                        var result = await dialog.ShowDialog<ModConflictResolution>(mainWindow);
+
+                        _logger.Information("用户选择冲突解决策略: {Resolution}", result);
+                        return result;
+                    });
+
+                    return resolution;
+                };
+
                 var results = await _downloadService.DownloadWithDependenciesAsync(
                     item.Version.ProjectId,
                     gameVersion,
@@ -374,7 +403,8 @@ namespace MOneClickDownloads.App.ViewModels
                     savePath,
                     versionType,
                     progress,
-                    _downloadCts.Token
+                    _downloadCts.Token,
+                    conflictCallback
                 );
 
                 stopwatch.Stop();

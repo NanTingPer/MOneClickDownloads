@@ -17,7 +17,8 @@ namespace MOneClickDownloads.Service
     /// 内部维护一组 IModFileAnalyzer 实例，按优先级依次尝试：<br />
     /// 1. NeoForge（META-INF/neoforge.mods.toml）<br />
     /// 2. Forge（META-INF/mods.toml）<br />
-    /// 3. Fabric/Quilt（fabric.mod.json）<br />
+    /// 3. Legacy Forge（mcmod.info，1.12.2 及更早版本）<br />
+    /// 4. Fabric/Quilt（fabric.mod.json）<br />
     /// <br />
     /// 使用示例：<br />
     /// <code>
@@ -41,11 +42,12 @@ namespace MOneClickDownloads.Service
         /// 构造模组分析服务。<br />
         /// <br />
         /// 初始化所有内置分析器并按检测优先级排列：<br />
-        /// NeoForge → Forge → Fabric/Quilt<br />
+        /// NeoForge → Forge → Legacy Forge → Fabric/Quilt<br />
         /// <br />
         /// 优先级说明：<br />
         /// - NeoForge 优先于 Forge：因为 NeoForge 的 neoforge.mods.toml 路径更具体<br />
-        /// - Forge 优先于 Fabric：因为 mods.toml 路径更具体<br />
+        /// - Forge 优先于 Legacy Forge：因为 mods.toml 是 1.13+ 的新格式，优先匹配<br />
+        /// - Legacy Forge 优先于 Fabric：因为 mcmod.info 路径更具体<br />
         /// - Fabric/Quilt 最后：作为兜底检测<br />
         /// - 各分析器通过检测不同特征文件来判断适用性，互不冲突
         /// </summary>
@@ -58,6 +60,7 @@ namespace MOneClickDownloads.Service
             {
                 new NeoForgeModAnalyzer(),
                 new ForgeModAnalyzer(),
+                new LegacyForgeModAnalyzer(),
                 new FabricModAnalyzer()
             };
 

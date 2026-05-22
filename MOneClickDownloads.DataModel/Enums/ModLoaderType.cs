@@ -15,6 +15,7 @@ namespace MOneClickDownloads.DataModel.Enums
     /// - Fabric/Quilt: 存在 fabric.mod.json
     /// - Forge: 存在 META-INF/mods.toml
     /// - NeoForge: 存在 META-INF/neoforge.mods.toml
+    /// - Legacy Forge: 存在 mcmod.info（1.12.2 及更早版本）
     /// </summary>
     public enum ModLoaderType
     {

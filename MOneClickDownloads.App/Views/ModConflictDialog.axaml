@@ -1,0 +1,60 @@
+<Window xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:m="using:MOneClickDownloads.DataModel.Enums"
+             xmlns:conv="using:MOneClickDownloads.App.Converters"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="480" d:DesignHeight="320"
+             x:Class="MOneClickDownloads.App.Views.ModConflictDialog"
+             Title="模组冲突检测"
+             Width="480" Height="320"
+             WindowStartupLocation="CenterOwner"
+             CanResize="False">
+
+    <DockPanel Margin="20,16">
+        <!-- 底部按钮区 -->
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" 
+                    Spacing="8" HorizontalAlignment="Right" Margin="0,16,0,0">
+            <Button Content="跳过" Padding="20,8" FontSize="14"
+                    x:Name="SkipButton"/>
+            <Button Content="替换" Padding="20,8" FontSize="14"
+                    x:Name="ReplaceButton"/>
+            <Button Content="保留两者" Padding="20,8" FontSize="14"
+                    x:Name="KeepBothButton"/>
+        </StackPanel>
+
+        <!-- 内容区 -->
+        <StackPanel Spacing="12" VerticalAlignment="Top">
+            <!-- 冲突类型标题 -->
+            <TextBlock x:Name="ConflictTitle" FontSize="18" FontWeight="Bold"
+                       TextWrapping="Wrap"/>
+
+            <!-- 冲突详情 -->
+            <TextBlock x:Name="ConflictDescription" FontSize="14"
+                       TextWrapping="Wrap"
+                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+
+            <!-- 分隔线 -->
+            <Border Height="1" Background="{DynamicResource CardStrokeColorDefaultBrush}"
+                    Margin="0,4"/>
+
+            <!-- 版本信息 -->
+            <StackPanel Spacing="6">
+                <TextBlock x:Name="ExistingVersionText" FontSize="14"
+                           TextWrapping="Wrap"/>
+                <TextBlock x:Name="NewVersionText" FontSize="14"
+                           TextWrapping="Wrap"/>
+            </StackPanel>
+
+            <!-- 操作说明 -->
+            <TextBlock FontSize="13" TextWrapping="Wrap"
+                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                       Margin="0,4,0,0">
+                <TextBlock.Text>
+                    <MultiBinding StringFormat="选择操作：&#x0a;跳过 - 保留本地版本，不下载&#x0a;替换 - 删除本地版本并下载新版本&#x0a;保留两者 - 同时保留两个版本">
+                    </MultiBinding>
+                </TextBlock.Text>
+            </TextBlock>
+        </StackPanel>
+    </DockPanel>
+</Window>
