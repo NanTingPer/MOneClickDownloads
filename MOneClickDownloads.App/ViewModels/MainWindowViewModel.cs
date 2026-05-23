@@ -101,5 +101,14 @@ namespace MOneClickDownloads.App.ViewModels
             Logger.Information("导航到合集下载页面: CollectionName={Name}, SavePath={Path}", collection.Name, saveDirectory);
             CurrentViewModel = _navigation.CreateCollectionDownloadViewModel(collection, saveDirectory);
         }
+
+        /// <summary>
+        /// 导航到本地模组管理页面
+        /// </summary>
+        public void NavigateToLocalMods()
+        {
+            Logger.Information("导航到本地模组管理页面");
+            CurrentViewModel = _navigation.CreateLocalModsViewModel();
+        }
     }
 }

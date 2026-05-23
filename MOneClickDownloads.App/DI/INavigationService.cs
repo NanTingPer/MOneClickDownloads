@@ -50,5 +50,11 @@ namespace MOneClickDownloads.App.DI
         /// <param name="saveDirectory">保存目录</param>
         /// <returns>合集下载页面 ViewModel</returns>
         CollectionDownloadViewModel CreateCollectionDownloadViewModel(FavoriteCollection collection, string saveDirectory);
+
+        /// <summary>
+        /// 创建本地模组管理页面 ViewModel。
+        /// </summary>
+        /// <returns>本地模组管理页面 ViewModel</returns>
+        LocalModsViewModel CreateLocalModsViewModel();
     }
 }

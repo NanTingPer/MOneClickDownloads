@@ -79,5 +79,14 @@ namespace MOneClickDownloads.App.DI
             return ActivatorUtilities.CreateInstance<CollectionDownloadViewModel>(
                 _serviceProvider, collection, saveDirectory);
         }
+
+        /// <summary>
+        /// 创建本地模组管理页面 ViewModel。
+        /// 从 DI 容器解析 LocalModsViewModel（Transient）。
+        /// </summary>
+        public LocalModsViewModel CreateLocalModsViewModel()
+        {
+            return _serviceProvider.GetRequiredService<LocalModsViewModel>();
+        }
     }
 }

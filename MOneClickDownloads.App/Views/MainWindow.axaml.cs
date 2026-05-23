@@ -225,6 +225,10 @@ namespace MOneClickDownloads.App.Views
                     vm.NavigateToFavorites();
                     vm.CurrentPageName = "收藏夹";
                     break;
+                case "LocalMods":
+                    vm.NavigateToLocalMods();
+                    vm.CurrentPageName = "本地模组";
+                    break;
             }
 
             // 导航后自动收起侧边栏

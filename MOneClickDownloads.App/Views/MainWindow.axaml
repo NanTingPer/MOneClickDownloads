@@ -82,6 +82,15 @@
                                 <TextBlock Text="收藏夹"/>
                             </StackPanel>
                         </Button>
+                        <!-- 本地模组 -->
+                        <Button Classes="sidebar-nav-btn cursor-pointer"
+                                Tag="LocalMods"
+                                Click="OnSidebarNavClick">
+                            <StackPanel Orientation="Horizontal" Classes="gap-2 items-center">
+                                <TextBlock Text="📦" FontSize="16"/>
+                                <TextBlock Text="本地模组"/>
+                            </StackPanel>
+                        </Button>
                     </StackPanel>
                 </Border>
             </Panel>

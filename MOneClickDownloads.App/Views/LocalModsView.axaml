@@ -1,0 +1,390 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:MOneClickDownloads.App.ViewModels"
+             xmlns:m="using:MOneClickDownloads.App.Models"
+             xmlns:conv="using:MOneClickDownloads.App.Converters"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="600"
+             x:Class="MOneClickDownloads.App.Views.LocalModsView"
+             x:DataType="vm:LocalModsViewModel">
+
+    <DockPanel>
+        <!-- 顶部：返回按钮 + 标题 -->
+        <Border DockPanel.Dock="Top" Padding="16,12">
+            <DockPanel>
+                <Button Content="← 返回搜索"
+                        Command="{Binding GoBackCommand}"
+                        HorizontalAlignment="Left"
+                        DockPanel.Dock="Left"
+                        Padding="8,4"/>
+                <TextBlock Text="本地模组管理"
+                           FontSize="22" FontWeight="Bold"
+                           VerticalAlignment="Center"
+                           Margin="8,4,0,0"/>
+            </DockPanel>
+        </Border>
+
+        <!-- 底部：更新进度 / 状态文本 -->
+        <Border DockPanel.Dock="Bottom" Padding="16,12"
+                IsVisible="{Binding IsUpdating}">
+            <StackPanel Spacing="8">
+                <ProgressBar Value="{Binding UpdateProgressValue}"
+                             Maximum="100" Height="8"/>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <TextBlock Text="{Binding StatusMessage}"
+                               FontSize="14"
+                               VerticalAlignment="Center"
+                               TextTrimming="CharacterEllipsis"/>
+                    <Button Content="取消更新"
+                            Command="{Binding CancelUpdateCommand}"
+                            Padding="12,6" FontSize="14"/>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- 非更新时的底部状态文本 -->
+        <Border DockPanel.Dock="Bottom" Padding="16,12"
+                IsVisible="{Binding !IsUpdating}">
+            <DockPanel>
+                <!-- 更新全部按钮 -->
+                <Button Content="🔄 更新全部"
+                        Command="{Binding UpdateAllCommand}"
+                        DockPanel.Dock="Right"
+                        Padding="12,6" FontSize="14"/>
+                <!-- 检查更新按钮 -->
+                <Button Content="🔍 检查更新"
+                        Command="{Binding CheckUpdateCommand}"
+                        DockPanel.Dock="Right"
+                        Padding="12,6" FontSize="14"
+                        Margin="0,0,8,0"/>
+                <TextBlock Text="{Binding StatusMessage}"
+                           FontSize="14"
+                           VerticalAlignment="Center"
+                           Margin="0,0,12,0"
+                           TextTrimming="CharacterEllipsis"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+            </DockPanel>
+        </Border>
+
+        <!-- 筛选标签区域（与 CollectionDownloadView 一致） -->
+        <Border DockPanel.Dock="Top" Padding="16,8">
+            <StackPanel Spacing="6">
+                <!-- 加载器过滤标签栏 -->
+                <ItemsControl ItemsSource="{Binding AvailableLoaders}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal" Spacing="8"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="x:String">
+                            <Button Command="{Binding #LocalModList.DataContext.ToggleLoaderFilterCommand}"
+                                    CommandParameter="{Binding}"
+                                    Padding="14,6"
+                                    Cursor="Hand">
+                                <Button.Template>
+                                    <ControlTemplate>
+                                        <Border CornerRadius="20"
+                                                Padding="{TemplateBinding Padding}"
+                                                BorderThickness="1"
+                                                BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
+                                                Cursor="Hand">
+                                            <Border.Background>
+                                                <MultiBinding Converter="{x:Static conv:StringEqualsConverter.Instance}">
+                                                    <Binding/>
+                                                    <Binding Path="#LocalModList.DataContext.ActiveLoaderFilter"
+                                                             RelativeSource="{RelativeSource AncestorType=ItemsControl}"/>
+                                                </MultiBinding>
+                                            </Border.Background>
+                                            <TextBlock Text="{Binding}"
+                                                       FontSize="15"
+                                                       VerticalAlignment="Center"/>
+                                        </Border>
+                                    </ControlTemplate>
+                                </Button.Template>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <!-- MC版本过滤：可展开列表 -->
+                <StackPanel>
+                    <ToggleButton x:Name="McVersionToggle"
+                                  Padding="12,6"
+                                  HorizontalAlignment="Left"
+                                  IsChecked="True"
+                                  Background="Transparent"
+                                  Cursor="Hand">
+                        <StackPanel Orientation="Horizontal" Spacing="4">
+                            <TextBlock Text="MC版本"
+                                       FontSize="14"
+                                       FontWeight="SemiBold"
+                                       VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding #McVersionToggle.IsChecked,
+                                       Converter={x:Static conv:BoolToArrowConverter.Instance}}"
+                                       FontSize="12"
+                                       VerticalAlignment="Center"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                        </StackPanel>
+                    </ToggleButton>
+                    <ScrollViewer MaxHeight="200"
+                                  IsVisible="{Binding #McVersionToggle.IsChecked}"
+                                  Margin="0,6,0,0">
+                        <ItemsControl ItemsSource="{Binding AvailableMcVersions}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="x:String">
+                                    <Button Command="{Binding #LocalModList.DataContext.ToggleMcVersionFilterCommand}"
+                                            CommandParameter="{Binding}"
+                                            Padding="14,6"
+                                            Classes="mr-2 mb-2"
+                                            Cursor="Hand">
+                                        <Button.Template>
+                                            <ControlTemplate>
+                                                <Border CornerRadius="20"
+                                                        Padding="{TemplateBinding Padding}"
+                                                        Margin="{TemplateBinding Margin}"
+                                                        BorderThickness="1"
+                                                        BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
+                                                        Cursor="Hand">
+                                                    <Border.Background>
+                                                        <MultiBinding Converter="{x:Static conv:StringEqualsConverter.Instance}">
+                                                            <Binding/>
+                                                            <Binding Path="#LocalModList.DataContext.ActiveMcVersionFilter"
+                                                                     RelativeSource="{RelativeSource AncestorType=ItemsControl}"/>
+                                                        </MultiBinding>
+                                                    </Border.Background>
+                                                    <TextBlock Text="{Binding}"
+                                                               FontSize="14"
+                                                               VerticalAlignment="Center"/>
+                                                </Border>
+                                            </ControlTemplate>
+                                        </Button.Template>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- 中部：左侧文件夹列表 + 右侧模组列表 -->
+        <Panel>
+            <!-- 加载中 -->
+            <StackPanel IsVisible="{Binding IsLoading}"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Spacing="8">
+                <ProgressBar IsIndeterminate="True" Width="200" Height="4"/>
+                <TextBlock Text="正在扫描本地模组..."
+                           FontSize="14"
+                           HorizontalAlignment="Center"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+            </StackPanel>
+
+            <!-- 空状态 -->
+            <StackPanel HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Spacing="8"
+                        IsVisible="{Binding !IsLoading}">
+                <TextBlock Text="📦"
+                           FontSize="48"
+                           HorizontalAlignment="Center"/>
+                <TextBlock Text="{Binding EmptyMessage}"
+                           FontSize="15"
+                           HorizontalAlignment="Center"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+            </StackPanel>
+
+            <!-- 主内容区：左侧文件夹 + 右侧模组 -->
+            <Grid ColumnDefinitions="180,4,*" IsVisible="{Binding !IsLoading}">
+                <!-- 左侧：文件夹列表 -->
+                <Border Grid.Column="0" Padding="8,0,0,0">
+                    <DockPanel>
+                        <!-- 添加文件夹按钮 -->
+                        <Button Content="＋ 添加文件夹"
+                                Command="{Binding AddFolderCommand}"
+                                DockPanel.Dock="Bottom"
+                                Padding="8,6"
+                                HorizontalAlignment="Stretch"
+                                FontSize="13"
+                                Margin="0,8,0,0"/>
+                        <!-- 文件夹列表 -->
+                        <ListBox ItemsSource="{Binding Folders}"
+                                 SelectedItem="{Binding SelectedFolder}"
+                                 Background="Transparent"
+                                 BorderThickness="0">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate x:DataType="m:LocalModFolder">
+                                    <Border Padding="8,6" Margin="0,2"
+                                            CornerRadius="4"
+                                            HorizontalAlignment="Stretch">
+                                        <DockPanel>
+                                            <!-- 删除按钮 -->
+                                            <Button Content="×"
+                                                    Command="{Binding #LocalModList.DataContext.RemoveFolderCommand}"
+                                                    CommandParameter="{Binding}"
+                                                    DockPanel.Dock="Right"
+                                                    Background="Transparent"
+                                                    FontSize="14"
+                                                    Padding="4,0"
+                                                    VerticalAlignment="Center"
+                                                    Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                                            <!-- 文件夹名 -->
+                                            <StackPanel DockPanel.Dock="Left">
+                                                <TextBlock Text="{Binding DisplayName}"
+                                                           FontSize="14"
+                                                           TextTrimming="CharacterEllipsis"/>
+                                                <TextBlock FontSize="11"
+                                                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                                           TextTrimming="CharacterEllipsis">
+                                                    <TextBlock.Text>
+                                                        <Binding Path="FolderPath"/>
+                                                    </TextBlock.Text>
+                                                </TextBlock>
+                                            </StackPanel>
+                                        </DockPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </DockPanel>
+                </Border>
+
+                <!-- 分隔线 -->
+                <Border Grid.Column="1" Width="1"
+                        Background="{DynamicResource CardStrokeColorDefaultBrush}"
+                        Margin="4,0"/>
+
+                <!-- 右侧：模组列表 -->
+                <Panel Grid.Column="2">
+                    <!-- 检查更新中 -->
+                    <StackPanel IsVisible="{Binding IsCheckingUpdate}"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Spacing="8">
+                        <ProgressBar IsIndeterminate="True" Width="200" Height="4"/>
+                        <TextBlock Text="正在检查更新..."
+                                   FontSize="14"
+                                   HorizontalAlignment="Center"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                    </StackPanel>
+
+                    <!-- 更新摘要（检查更新后显示） -->
+                    <Border DockPanel.Dock="Top" Padding="12,8"
+                            IsVisible="{Binding HasCheckedUpdate}"
+                            CornerRadius="4"
+                            Margin="8,0,8,8"
+                            Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                            BorderThickness="1"
+                            BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}">
+                        <TextBlock Text="{Binding UpdateSummary}"
+                                   FontSize="14"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                    </Border>
+
+                    <!-- 模组列表 -->
+                    <ScrollViewer IsVisible="{Binding !IsCheckingUpdate}" Padding="8,0,0,0">
+                        <ItemsControl x:Name="LocalModList" ItemsSource="{Binding ModItems}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="m:LocalModDisplayItem">
+                                    <Border Margin="0,0,8,4"
+                                            BorderThickness="1"
+                                            BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                                            Background="Transparent"
+                                            CornerRadius="4"
+                                            HorizontalAlignment="Stretch">
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <!-- 左侧：模组信息 -->
+                                            <Button Grid.Column="0"
+                                                    Padding="12,10"
+                                                    Background="Transparent"
+                                                    HorizontalAlignment="Stretch"
+                                                    HorizontalContentAlignment="Stretch">
+                                                <Grid ColumnDefinitions="Auto,*,Auto">
+                                                    <!-- 模组图标 -->
+                                                    <Border Grid.Column="0"
+                                                            Width="40" Height="40"
+                                                            CornerRadius="4"
+                                                            ClipToBounds="True"
+                                                            Margin="0,0,8,0">
+                                                        <conv:AsyncImage Url="{Binding IconUrl}"
+                                                                         Width="40" Height="40"
+                                                                         Stretch="Uniform"/>
+                                                    </Border>
+                                                    <!-- 文本信息 -->
+                                                    <StackPanel Grid.Column="1"
+                                                                Margin="0,0,0,0"
+                                                                Spacing="2">
+                                                        <TextBlock Text="{Binding DisplayName}"
+                                                                   FontSize="15"
+                                                                   VerticalAlignment="Center"/>
+                                                        <TextBlock Text="{Binding DisplayDescription}"
+                                                                   FontSize="13"
+                                                                   MaxLines="1"
+                                                                   TextTrimming="CharacterEllipsis"
+                                                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                                                        <StackPanel Orientation="Horizontal"
+                                                                    Spacing="12">
+                                                            <TextBlock FontSize="12"
+                                                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}">
+                                                                <TextBlock.Text>
+                                                                    <MultiBinding StringFormat="版本: {0}">
+                                                                        <Binding Path="CurrentVersion"/>
+                                                                    </MultiBinding>
+                                                                </TextBlock.Text>
+                                                            </TextBlock>
+                                                            <TextBlock FontSize="12"
+                                                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}">
+                                                                <TextBlock.Text>
+                                                                    <MultiBinding StringFormat="↓ {0} 下载">
+                                                                        <Binding Path="FormattedDownloads"/>
+                                                                    </MultiBinding>
+                                                                </TextBlock.Text>
+                                                            </TextBlock>
+                                                        </StackPanel>
+                                                    </StackPanel>
+                                                    <!-- 更新状态标签 -->
+                                                    <Border Grid.Column="2"
+                                                            CornerRadius="4"
+                                                            Padding="6,2"
+                                                            Margin="8,0,0,0"
+                                                            VerticalAlignment="Center">
+                                                        <Border.Background>
+                                                            <Binding Path="UpdateStatus"
+                                                                     Converter="{x:Static conv:LocalModUpdateStatusBrushConverter.Instance}"/>
+                                                        </Border.Background>
+                                                        <TextBlock Text="{Binding UpdateStatusText}"
+                                                                   FontSize="13"
+                                                                   FontWeight="SemiBold"
+                                                                   VerticalAlignment="Center"/>
+                                                    </Border>
+                                                </Grid>
+                                            </Button>
+                                            <!-- 右侧：删除按钮 -->
+                                            <Button Grid.Column="1"
+                                                    Content="删除"
+                                                    FontSize="14"
+                                                    Padding="12,10"
+                                                    Background="Transparent"
+                                                    Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                                    VerticalAlignment="Stretch"
+                                                    Click="OnDeleteModFileClick"/>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </Panel>
+            </Grid>
+        </Panel>
+    </DockPanel>
+</UserControl>

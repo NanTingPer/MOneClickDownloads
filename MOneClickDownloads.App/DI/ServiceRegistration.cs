@@ -55,6 +55,13 @@ namespace MOneClickDownloads.App.DI
                 return new FavoriteService(packagePath);
             });
 
+            // 本地模组文件夹管理服务 - JSON 文件持久化
+            services.AddSingleton<ILocalModFolderService>(sp =>
+            {
+                var packagePath = Path.Combine(AppContext.BaseDirectory, "package");
+                return new LocalModFolderService(packagePath);
+            });
+
             // ===== ViewModel 层 =====
 
             // MainWindowViewModel - Singleton（应用主 VM，管理导航状态）
@@ -65,6 +72,9 @@ namespace MOneClickDownloads.App.DI
 
             // FavoritesViewModel - Transient（每次导航到收藏夹页面时创建新实例）
             services.AddTransient<FavoritesViewModel>();
+
+            // LocalModsViewModel - Transient（每次导航到本地模组管理页面时创建新实例）
+            services.AddTransient<LocalModsViewModel>();
 
             // ModDetailViewModel 通过 ActivatorUtilities.CreateInstance 创建（需要运行时参数）
 
