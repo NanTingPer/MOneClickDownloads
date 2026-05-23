@@ -27,7 +27,7 @@ namespace MOneClickDownloads.App.ViewModels
     /// 本地模组管理页面 ViewModel。<br />
     /// <br />
     /// 核心流程：<br />
-    /// 1. 管理已记录的本地 mods 文件夹列表<br />
+    /// 1. 管理已记录的本地 mods 文件夹列表（支持重命名、版本元数据持久化）<br />
     /// 2. 选中文件夹后扫描本地 JAR 文件，展示模组列表<br />
     /// 3. 用户设置 MC版本 + 加载器过滤器后，可点击"检查更新"对比版本<br />
     /// 4. 点击"更新全部"批量更新有新版本的模组（保持原文件名）<br />
@@ -140,6 +140,12 @@ namespace MOneClickDownloads.App.ViewModels
         [ObservableProperty]
         private string _updateSummary = string.Empty;
 
+        /// <summary>
+        /// 是否正在刷新筛选元数据
+        /// </summary>
+        [ObservableProperty]
+        private bool _isRefreshingMetadata;
+
         private CancellationTokenSource? _updateCts;
 
         /// <summary>
@@ -178,9 +184,17 @@ namespace MOneClickDownloads.App.ViewModels
         /// </summary>
         private void LoadFolders()
         {
-            var paths = _folderService.GetAllFolders();
+            var entries = _folderService.GetAllFolders();
             Folders = new ObservableCollection<LocalModFolder>(
-                paths.Select(p => new LocalModFolder { FolderPath = p }));
+                entries.Select(e => new LocalModFolder
+                {
+                    FolderPath = e.FolderPath,
+                    CustomName = e.CustomName,
+                    AvailableMcVersions = e.AvailableMcVersions ?? new List<string>(),
+                    AvailableLoaders = e.AvailableLoaders ?? new List<string>(),
+                    MetadataProjectId = e.MetadataProjectId,
+                    MetadataModName = e.MetadataModName
+                }));
             Logger.Information("文件夹列表加载完成: {Count} 个", Folders.Count);
         }
 
@@ -189,16 +203,26 @@ namespace MOneClickDownloads.App.ViewModels
         /// </summary>
         private void OnFolderChanged(object? sender, EventArgs e)
         {
+            // 保存当前选中的路径，重新加载后恢复选中
+            var selectedPath = SelectedFolder?.FolderPath;
             LoadFolders();
+
+            if (selectedPath != null)
+            {
+                SelectedFolder = Folders.FirstOrDefault(f =>
+                    string.Equals(f.FolderPath, selectedPath, StringComparison.OrdinalIgnoreCase));
+            }
         }
 
         /// <summary>
-        /// 选中文件夹变更时扫描本地模组
+        /// 选中文件夹变更时扫描本地模组，并恢复持久化的筛选器
         /// </summary>
         partial void OnSelectedFolderChanged(LocalModFolder? value)
         {
             if (value != null)
             {
+                // 恢复持久化的筛选元数据
+                RestoreFilterMetadata(value);
                 ScanFolderCommand.Execute(null);
             }
             else
@@ -206,6 +230,28 @@ namespace MOneClickDownloads.App.ViewModels
                 ModItems.Clear();
                 HasItems = false;
                 EmptyMessage = "请选择左侧文件夹查看模组";
+                AvailableMcVersions.Clear();
+                AvailableLoaders.Clear();
+            }
+        }
+
+        /// <summary>
+        /// 恢复文件夹持久化的筛选元数据
+        /// </summary>
+        private void RestoreFilterMetadata(LocalModFolder folder)
+        {
+            AvailableMcVersions.Clear();
+            foreach (var v in folder.AvailableMcVersions)
+                AvailableMcVersions.Add(v);
+
+            AvailableLoaders.Clear();
+            foreach (var l in folder.AvailableLoaders)
+                AvailableLoaders.Add(l);
+
+            if (folder.AvailableMcVersions.Count > 0 || folder.AvailableLoaders.Count > 0)
+            {
+                Logger.Information("已恢复文件夹筛选元数据: MC版本={McCount}, 加载器={LoaderCount}",
+                    folder.AvailableMcVersions.Count, folder.AvailableLoaders.Count);
             }
         }
 
@@ -279,21 +325,21 @@ namespace MOneClickDownloads.App.ViewModels
                 _ = Task.Run(async () => await EnrichModInfoAsync(items));
 
                 // 构建加载器选项（从本地 JAR 的 LoaderType 提取）
-                var loaders = inventory.InstalledMods
-                    .Select(m => m.LoaderType)
-                    .Where(l => l != ModLoaderType.Unknown)
-                    .Distinct()
-                    .Select(l => l.ToString().ToLowerInvariant())
-                    .OrderBy(l => l)
-                    .ToList();
+                // 仅当持久化的加载器列表为空时才从本地提取
+                if (SelectedFolder.AvailableLoaders.Count == 0)
+                {
+                    var loaders = inventory.InstalledMods
+                        .Select(m => m.LoaderType)
+                        .Where(l => l != ModLoaderType.Unknown)
+                        .Distinct()
+                        .Select(l => l.ToString().ToLowerInvariant())
+                        .OrderBy(l => l)
+                        .ToList();
 
-                AvailableLoaders.Clear();
-                foreach (var l in loaders)
-                    AvailableLoaders.Add(l);
-
-                // MC版本过滤器暂时不从本地获取（本地无法得知兼容的MC版本）
-                // 将在检查更新时从 API 获取
-                AvailableMcVersions.Clear();
+                    AvailableLoaders.Clear();
+                    foreach (var l in loaders)
+                        AvailableLoaders.Add(l);
+                }
 
                 Logger.Information("文件夹扫描完成: {Count} 个模组", items.Count);
                 StatusMessage = $"共识别 {items.Count} 个模组";
@@ -407,6 +453,29 @@ namespace MOneClickDownloads.App.ViewModels
         }
 
         /// <summary>
+        /// 重命名文件夹（弹出输入对话框）
+        /// </summary>
+        [RelayCommand]
+        private async Task RenameFolderAsync(LocalModFolder? folder)
+        {
+            if (folder == null) return;
+
+            var mainWindow = GetMainWindow();
+            if (mainWindow == null) return;
+
+            var dialog = new CreateCollectionDialog(true, folder.DisplayName);
+            var newName = await dialog.ShowDialog<string?>(mainWindow);
+
+            if (string.IsNullOrEmpty(newName)) return;
+
+            Logger.Information("用户重命名文件夹: {Path} -> {Name}", folder.FolderPath, newName);
+            _folderService.RenameFolder(folder.FolderPath, newName);
+
+            // 立即更新 UI（不等待 Changed 事件）
+            folder.CustomName = newName;
+        }
+
+        /// <summary>
         /// 切换MC版本过滤器
         /// </summary>
         [RelayCommand]
@@ -422,6 +491,131 @@ namespace MOneClickDownloads.App.ViewModels
         private void ToggleLoaderFilter(string? loader)
         {
             ActiveLoaderFilter = ActiveLoaderFilter == loader ? null : loader;
+        }
+
+        /// <summary>
+        /// 更新筛选元数据（通过 API 获取版本信息并持久化）
+        /// </summary>
+        [RelayCommand]
+        private async Task RefreshFilterMetadataAsync()
+        {
+            if (SelectedFolder == null)
+            {
+                StatusMessage = "请先选择一个文件夹";
+                return;
+            }
+
+            Logger.Information("开始更新筛选元数据: {Path}", SelectedFolder.FolderPath);
+            IsRefreshingMetadata = true;
+            StatusMessage = "正在更新筛选元数据...";
+
+            try
+            {
+                // 寻找一个已有 ProjectId 的模组
+                var referenceItem = ModItems.FirstOrDefault(m => !string.IsNullOrEmpty(m.ProjectId));
+
+                if (referenceItem == null)
+                {
+                    // 如果还没有 ProjectId，尝试先补充一个
+                    StatusMessage = "正在识别模组信息...";
+                    foreach (var item in ModItems.Take(5))
+                    {
+                        try
+                        {
+                            var searchResult = await _apiService.SearchProjectsAsync(
+                                item.DisplayName, null, null, 0, 5);
+
+                            var hit = searchResult.Hits
+                                .FirstOrDefault(h =>
+                                    string.Equals(h.Title, item.DisplayName, StringComparison.OrdinalIgnoreCase) ||
+                                    string.Equals(h.Slug, item.ModId, StringComparison.OrdinalIgnoreCase));
+
+                            if (hit != null)
+                            {
+                                item.ProjectId = hit.ProjectId;
+                                item.Slug = hit.Slug;
+                                item.IconUrl = hit.IconUrl;
+                                item.Downloads = hit.Downloads;
+                                item.ProjectType = hit.ProjectType;
+                                if (!string.IsNullOrEmpty(hit.Description))
+                                    item.DisplayDescription = hit.Description;
+
+                                referenceItem = item;
+                                Logger.Information("识别到参考模组: {Name} -> ProjectId={ProjectId}", item.DisplayName, hit.ProjectId);
+                                break;
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.Warning(ex, "识别模组失败: {Name}", item.DisplayName);
+                        }
+                    }
+                }
+
+                if (referenceItem == null || string.IsNullOrEmpty(referenceItem.ProjectId))
+                {
+                    StatusMessage = "未能识别任何模组，无法获取版本元数据";
+                    Logger.Warning("未能找到可用于获取版本元数据的参考模组");
+                    return;
+                }
+
+                StatusMessage = $"正在获取 {referenceItem.DisplayName} 的版本信息...";
+                var versions = await _apiService.GetProjectVersionsAsync(referenceItem.ProjectId);
+
+                // 提取 MC 版本列表
+                var allMcVersions = new HashSet<string>();
+                foreach (var v in versions)
+                    foreach (var gv in v.GameVersions)
+                        allMcVersions.Add(gv);
+
+                var sortedMcVersions = allMcVersions
+                    .OrderByDescending(v => v, new McVersionComparer())
+                    .ToList();
+
+                // 提取加载器列表
+                var allLoaders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var v in versions)
+                    foreach (var loader in v.Loaders)
+                        allLoaders.Add(loader.ToLowerInvariant());
+
+                var sortedLoaders = allLoaders.OrderBy(l => l).ToList();
+
+                // 更新 UI
+                AvailableMcVersions.Clear();
+                foreach (var v in sortedMcVersions)
+                    AvailableMcVersions.Add(v);
+
+                AvailableLoaders.Clear();
+                foreach (var l in sortedLoaders)
+                    AvailableLoaders.Add(l);
+
+                // 持久化到文件夹模型
+                _folderService.UpdateFolderMetadata(
+                    SelectedFolder.FolderPath,
+                    sortedMcVersions,
+                    sortedLoaders,
+                    referenceItem.ProjectId,
+                    referenceItem.DisplayName);
+
+                // 更新本地模型
+                SelectedFolder.AvailableMcVersions = sortedMcVersions;
+                SelectedFolder.AvailableLoaders = sortedLoaders;
+                SelectedFolder.MetadataProjectId = referenceItem.ProjectId;
+                SelectedFolder.MetadataModName = referenceItem.DisplayName;
+
+                StatusMessage = $"筛选元数据已更新: {sortedMcVersions.Count} 个 MC 版本, {sortedLoaders.Count} 个加载器 (参考: {referenceItem.DisplayName})";
+                Logger.Information("筛选元数据更新完成: MC版本={McCount}, 加载器={LoaderCount}, 参考模组={Mod}",
+                    sortedMcVersions.Count, sortedLoaders.Count, referenceItem.DisplayName);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "更新筛选元数据失败");
+                StatusMessage = $"更新筛选元数据失败: {ex.Message}";
+            }
+            finally
+            {
+                IsRefreshingMetadata = false;
+            }
         }
 
         /// <summary>
@@ -448,7 +642,6 @@ namespace MOneClickDownloads.App.ViewModels
             IsCheckingUpdate = true;
             StatusMessage = "正在检查更新...";
             _allVersionsCache.Clear();
-            AvailableMcVersions.Clear();
 
             var upToDate = 0;
             var updateAvailable = 0;
@@ -522,14 +715,6 @@ namespace MOneClickDownloads.App.ViewModels
                         error++;
                     }
                 }
-
-                // 更新MC版本可选列表
-                var sortedMcVersions = allMcVersions
-                    .OrderByDescending(v => v, new McVersionComparer())
-                    .ToList();
-                AvailableMcVersions.Clear();
-                foreach (var v in sortedMcVersions)
-                    AvailableMcVersions.Add(v);
 
                 HasCheckedUpdate = true;
                 UpdateSummary = $"有更新: {updateAvailable} | 已是最新: {upToDate} | 无兼容: {incompatible} | 未找到: {notFound}";
