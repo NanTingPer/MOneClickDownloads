@@ -105,10 +105,11 @@ namespace MOneClickDownloads.App.ViewModels
         /// <summary>
         /// 导航到本地模组管理页面
         /// </summary>
-        public void NavigateToLocalMods()
+        public async void NavigateToLocalMods()
         {
             Logger.Information("导航到本地模组管理页面");
-            CurrentViewModel = _navigation.CreateLocalModsViewModel();
+            var vm = await System.Threading.Tasks.Task.Run(() => _navigation.CreateLocalModsViewModel());
+            CurrentViewModel = vm;
         }
     }
 }

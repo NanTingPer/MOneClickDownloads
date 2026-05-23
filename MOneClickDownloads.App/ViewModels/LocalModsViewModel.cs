@@ -128,17 +128,6 @@ namespace MOneClickDownloads.App.ViewModels
         [ObservableProperty]
         private string? _activeLoaderFilter;
 
-        /// <summary>
-        /// 是否已完成检查更新
-        /// </summary>
-        [ObservableProperty]
-        private bool _hasCheckedUpdate;
-
-        /// <summary>
-        /// 更新状态摘要文本
-        /// </summary>
-        [ObservableProperty]
-        private string _updateSummary = string.Empty;
 
         /// <summary>
         /// 是否正在刷新筛选元数据
@@ -273,8 +262,6 @@ namespace MOneClickDownloads.App.ViewModels
         /// </summary>
         private void ResetUpdateStatus()
         {
-            HasCheckedUpdate = false;
-            UpdateSummary = string.Empty;
             foreach (var item in ModItems)
             {
                 item.UpdateStatus = LocalModUpdateStatus.Unknown;
@@ -328,13 +315,20 @@ namespace MOneClickDownloads.App.ViewModels
                 // 仅当持久化的加载器列表为空时才从本地提取
                 if (SelectedFolder.AvailableLoaders.Count == 0)
                 {
-                    var loaders = inventory.InstalledMods
-                        .Select(m => m.LoaderType)
-                        .Where(l => l != ModLoaderType.Unknown)
-                        .Distinct()
-                        .Select(l => l.ToString().ToLowerInvariant())
-                        .OrderBy(l => l)
-                        .ToList();
+                    // 始终包含所有常见加载器类型，确保用户可以选择任意加载器
+                    var allLoaders = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        "fabric", "forge", "neoforge", "quilt"
+                    };
+
+                    // 合并本地 JAR 中检测到的加载器类型
+                    foreach (var mod in inventory.InstalledMods)
+                    {
+                        if (mod.LoaderType != ModLoaderType.Unknown)
+                            allLoaders.Add(mod.LoaderType.ToString().ToLowerInvariant());
+                    }
+
+                    var loaders = allLoaders.OrderBy(l => l).ToList();
 
                     AvailableLoaders.Clear();
                     foreach (var l in loaders)
@@ -572,8 +566,11 @@ namespace MOneClickDownloads.App.ViewModels
                     .OrderByDescending(v => v, new McVersionComparer())
                     .ToList();
 
-                // 提取加载器列表
-                var allLoaders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                // 提取加载器列表（始终包含所有常见加载器类型）
+                var allLoaders = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    "fabric", "forge", "neoforge", "quilt"
+                };
                 foreach (var v in versions)
                     foreach (var loader in v.Loaders)
                         allLoaders.Add(loader.ToLowerInvariant());
@@ -716,11 +713,9 @@ namespace MOneClickDownloads.App.ViewModels
                     }
                 }
 
-                HasCheckedUpdate = true;
-                UpdateSummary = $"有更新: {updateAvailable} | 已是最新: {upToDate} | 无兼容: {incompatible} | 未找到: {notFound}";
+                StatusMessage = $"有更新: {updateAvailable} | 已是最新: {upToDate} | 无兼容: {incompatible} | 未找到: {notFound}";
                 if (error > 0)
-                    UpdateSummary += $" | 错误: {error}";
-                StatusMessage = UpdateSummary;
+                    StatusMessage += $" | 错误: {error}";
 
                 Logger.Information("检查更新完成: UpToDate={UpToDate}, UpdateAvailable={Update}, Incompatible={Incomp}, NotFound={NotFound}, Error={Error}",
                     upToDate, updateAvailable, incompatible, notFound, error);
@@ -742,9 +737,10 @@ namespace MOneClickDownloads.App.ViewModels
         [RelayCommand]
         private async Task UpdateAllAsync()
         {
-            if (!HasCheckedUpdate)
+            var hasCheckedAny = ModItems.Any(m => m.UpdateStatus != LocalModUpdateStatus.Unknown);
+            if (!hasCheckedAny)
             {
-            StatusMessage = "请先点击[检查更新]";
+                StatusMessage = "请先点击[检查更新]";
                 return;
             }
 
@@ -845,10 +841,10 @@ namespace MOneClickDownloads.App.ViewModels
                     Logger.Information("全部更新完成: {Count} 个", successCount);
                 }
 
-                // 刷新摘要
+                // 刷新状态消息
                 var upToDateCount = ModItems.Count(m => m.UpdateStatus == LocalModUpdateStatus.UpToDate);
                 var updateCount = ModItems.Count(m => m.UpdateStatus == LocalModUpdateStatus.UpdateAvailable);
-                UpdateSummary = $"有更新: {updateCount} | 已是最新: {upToDateCount}";
+                StatusMessage = $"有更新: {updateCount} | 已是最新: {upToDateCount}";
             }
 
             IsUpdating = false;

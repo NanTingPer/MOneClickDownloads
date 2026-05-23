@@ -182,37 +182,9 @@
         </Border>
 
         <!-- 中部：左侧文件夹列表 + 右侧模组列表 -->
-        <Panel>
-            <!-- 加载中 -->
-            <StackPanel IsVisible="{Binding IsLoading}"
-                        HorizontalAlignment="Center"
-                        VerticalAlignment="Center"
-                        Spacing="8">
-                <ProgressBar IsIndeterminate="True" Width="200" Height="4"/>
-                <TextBlock Text="正在扫描本地模组..."
-                           FontSize="14"
-                           HorizontalAlignment="Center"
-                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
-            </StackPanel>
-
-            <!-- 空状态 -->
-            <StackPanel HorizontalAlignment="Center"
-                        VerticalAlignment="Center"
-                        Spacing="8"
-                        IsVisible="{Binding !IsLoading}">
-                <TextBlock Text="📦"
-                           FontSize="48"
-                           HorizontalAlignment="Center"/>
-                <TextBlock Text="{Binding EmptyMessage}"
-                           FontSize="15"
-                           HorizontalAlignment="Center"
-                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
-            </StackPanel>
-
-            <!-- 主内容区：左侧文件夹 + 右侧模组 -->
-            <Grid ColumnDefinitions="180,4,*" IsVisible="{Binding !IsLoading}">
-                <!-- 左侧：文件夹列表 -->
-                <Border Grid.Column="0" Padding="8,0,0,0">
+        <Grid ColumnDefinitions="180,4,*">
+            <!-- 左侧：文件夹列表 -->
+            <Border Grid.Column="0" Padding="8,0,0,0">
                     <DockPanel>
                         <!-- 添加文件夹按钮 -->
                         <Button Content="＋ 添加文件夹"
@@ -271,45 +243,33 @@
                                     </Border>
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
-                        </ListBox>
-                    </DockPanel>
-                </Border>
+                    </ListBox>
+                </DockPanel>
+            </Border>
 
-                <!-- 分隔线 -->
-                <Border Grid.Column="1" Width="1"
-                        Background="{DynamicResource CardStrokeColorDefaultBrush}"
-                        Margin="4,0"/>
+            <!-- 分隔线 -->
+            <Border Grid.Column="1" Width="1"
+                    Background="{DynamicResource CardStrokeColorDefaultBrush}"
+                    Margin="4,0"/>
 
-                <!-- 右侧：模组列表 -->
-                <Panel Grid.Column="2">
-                    <!-- 检查更新中 -->
-                    <StackPanel IsVisible="{Binding IsCheckingUpdate}"
-                                HorizontalAlignment="Center"
-                                VerticalAlignment="Center"
-                                Spacing="8">
-                        <ProgressBar IsIndeterminate="True" Width="200" Height="4"/>
-                        <TextBlock Text="正在检查更新..."
-                                   FontSize="14"
-                                   HorizontalAlignment="Center"
-                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
-                    </StackPanel>
+            <!-- 右侧：模组列表区域 -->
+            <Panel Grid.Column="2">
+                <!-- 空状态 -->
+                <StackPanel HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Spacing="8"
+                            IsVisible="{Binding !HasItems}">
+                    <TextBlock Text="📦"
+                               FontSize="48"
+                               HorizontalAlignment="Center"/>
+                    <TextBlock Text="{Binding EmptyMessage}"
+                               FontSize="15"
+                               HorizontalAlignment="Center"
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                </StackPanel>
 
-                    <!-- 更新摘要（检查更新后显示） -->
-                    <Border DockPanel.Dock="Top" Padding="12,8"
-                            IsVisible="{Binding HasCheckedUpdate}"
-                            CornerRadius="4"
-                            Margin="8,0,8,8"
-                            Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
-                            BorderThickness="1"
-                            BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}">
-                        <TextBlock Text="{Binding UpdateSummary}"
-                                   FontSize="14"
-                                   FontWeight="SemiBold"
-                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
-                    </Border>
-
-                    <!-- 模组列表 -->
-                    <ScrollViewer IsVisible="{Binding !IsCheckingUpdate}" Padding="8,0,0,0">
+                <!-- 模组列表 -->
+                <ScrollViewer Padding="8,0,0,0" IsVisible="{Binding HasItems}">
                         <ItemsControl x:Name="LocalModList" ItemsSource="{Binding ModItems}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="m:LocalModDisplayItem">
@@ -400,9 +360,8 @@
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
-                    </ScrollViewer>
-                </Panel>
-            </Grid>
-        </Panel>
+                </ScrollViewer>
+            </Panel>
+        </Grid>
     </DockPanel>
 </UserControl>
