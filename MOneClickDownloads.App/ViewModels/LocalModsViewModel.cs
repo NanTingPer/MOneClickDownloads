@@ -43,6 +43,7 @@ namespace MOneClickDownloads.App.ViewModels
         private readonly IModAnalysisService _analysisService;
         private readonly ModDownloadService _downloadService;
         private readonly ConfigService _configService;
+        private readonly IIconCacheService _iconCacheService;
 
         /// <summary>
         /// 已记录的文件夹列表
@@ -148,7 +149,8 @@ namespace MOneClickDownloads.App.ViewModels
             ModrinthAPIService apiService,
             IModAnalysisService analysisService,
             ModDownloadService downloadService,
-            ConfigService configService)
+            ConfigService configService,
+            IIconCacheService iconCacheService)
         {
             Logger.Information("LocalModsViewModel 初始化开始");
 
@@ -158,6 +160,7 @@ namespace MOneClickDownloads.App.ViewModels
             _analysisService = analysisService;
             _downloadService = downloadService;
             _configService = configService;
+            _iconCacheService = iconCacheService;
 
             // 订阅文件夹变更事件
             _folderService.Changed += OnFolderChanged;
@@ -372,16 +375,29 @@ namespace MOneClickDownloads.App.ViewModels
 
                     if (hit != null)
                     {
+                        // 优先使用本地缓存图标
+                        var cachedIconPath = !string.IsNullOrEmpty(hit.IconUrl)
+                            ? _iconCacheService.GetCachedIconPath(item.ModId, hit.IconUrl)
+                            : null;
+
+                        var iconToSet = cachedIconPath ?? hit.IconUrl;
+
                         await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
                         {
                             item.ProjectId = hit.ProjectId;
                             item.Slug = hit.Slug;
-                            item.IconUrl = hit.IconUrl;
+                            item.IconUrl = iconToSet;
                             item.Downloads = hit.Downloads;
                             item.ProjectType = hit.ProjectType;
                             if (!string.IsNullOrEmpty(hit.Description))
                                 item.DisplayDescription = hit.Description;
                         });
+
+                        // 后台缓存/更新图标（无论是否已缓存，都执行以更新缓存）
+                        if (!string.IsNullOrEmpty(hit.IconUrl))
+                        {
+                            _ = Task.Run(async () => await _iconCacheService.CacheIconAsync(item.ModId, hit.IconUrl));
+                        }
 
                         Logger.Debug("补充模组信息成功: {ModId} -> ProjectId={ProjectId}", item.ModId, hit.ProjectId);
                     }
@@ -526,13 +542,24 @@ namespace MOneClickDownloads.App.ViewModels
 
                             if (hit != null)
                             {
+                                // 优先使用本地缓存图标
+                                var cachedPath = !string.IsNullOrEmpty(hit.IconUrl)
+                                    ? _iconCacheService.GetCachedIconPath(item.ModId, hit.IconUrl)
+                                    : null;
+
                                 item.ProjectId = hit.ProjectId;
                                 item.Slug = hit.Slug;
-                                item.IconUrl = hit.IconUrl;
+                                item.IconUrl = cachedPath ?? hit.IconUrl;
                                 item.Downloads = hit.Downloads;
                                 item.ProjectType = hit.ProjectType;
                                 if (!string.IsNullOrEmpty(hit.Description))
                                     item.DisplayDescription = hit.Description;
+
+                                // 后台缓存/更新图标
+                                if (!string.IsNullOrEmpty(hit.IconUrl))
+                                {
+                                    _ = Task.Run(async () => await _iconCacheService.CacheIconAsync(item.ModId, hit.IconUrl));
+                                }
 
                                 referenceItem = item;
                                 Logger.Information("识别到参考模组: {Name} -> ProjectId={ProjectId}", item.DisplayName, hit.ProjectId);

@@ -62,6 +62,12 @@ namespace MOneClickDownloads.App.DI
                 return new LocalModFolderService(packagePath);
             });
 
+            // 图标缓存服务 - 将模组图标持久化到 App 根目录下的 icon_cache 目录
+            services.AddSingleton<IIconCacheService>(sp =>
+            {
+                return new IconCacheService(AppContext.BaseDirectory);
+            });
+
             // ===== ViewModel 层 =====
 
             // MainWindowViewModel - Singleton（应用主 VM，管理导航状态）

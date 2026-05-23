@@ -19,6 +19,7 @@ namespace MOneClickDownloads.App.ViewModels
         private readonly INavigationService _navigation;
         private readonly ModSearchService _searchService;
         private readonly IFavoriteService _favoriteService;
+        private readonly IIconCacheService _iconCacheService;
         private readonly ILogger _logger;
 
         [ObservableProperty]
@@ -54,11 +55,16 @@ namespace MOneClickDownloads.App.ViewModels
         /// <param name="navigation">导航服务（DI 注入）</param>
         /// <param name="searchService">模组搜索服务（DI 注入）</param>
         /// <param name="favoriteService">收藏夹服务（DI 注入）</param>
-        public ModSearchViewModel(INavigationService navigation, ModSearchService searchService, IFavoriteService favoriteService)
+        public ModSearchViewModel(
+            INavigationService navigation,
+            ModSearchService searchService,
+            IFavoriteService favoriteService,
+            IIconCacheService iconCacheService)
         {
             _navigation = navigation;
             _searchService = searchService;
             _favoriteService = favoriteService;
+            _iconCacheService = iconCacheService;
             _logger = Log.ForContext<ModSearchViewModel>();
             _logger.Information("ModSearchViewModel 初始化完成");
         }
@@ -86,6 +92,16 @@ namespace MOneClickDownloads.App.ViewModels
 
                 StatusMessage = $"共找到 {TotalHits} 个结果";
                 _logger.Information("搜索完成: Query={Query}, TotalHits={TotalHits}", SearchQuery.Trim(), TotalHits);
+
+                // 后台缓存搜索结果的图标（使用 projectId 作为 modId）
+                var iconItems = response.Hits
+                    .Where(h => !string.IsNullOrEmpty(h.IconUrl))
+                    .Select(h => (h.ProjectId, h.IconUrl!))
+                    .ToList();
+                if (iconItems.Count > 0)
+                {
+                    _ = Task.Run(async () => await _iconCacheService.CacheIconsAsync(iconItems));
+                }
             }
             catch (Exception ex)
             {

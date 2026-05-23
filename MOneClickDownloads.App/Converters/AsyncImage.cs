@@ -46,10 +46,38 @@ namespace MOneClickDownloads.App.Converters
                 return;
             }
 
-            // 缓存命中
+            // 缓存命中（内存缓存）
             if (Cache.TryGetValue(url, out var cached))
             {
                 Source = cached;
+                return;
+            }
+
+            // 本地文件路径（非 HTTP URL），直接从磁盘加载
+            if (!url.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    if (File.Exists(url))
+                    {
+                        await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+                        {
+                            var bitmap = new Bitmap(url);
+                            Cache[url] = bitmap;
+                            Source = bitmap;
+                        });
+                    }
+                    else
+                    {
+                        Logger.Warning("本地图片文件不存在: {Path}", url);
+                        Cache[url] = null;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.Warning(ex, "加载本地图片失败: {Path}", url);
+                    Cache[url] = null;
+                }
                 return;
             }
 
