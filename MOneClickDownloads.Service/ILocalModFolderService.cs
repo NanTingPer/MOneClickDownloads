@@ -57,5 +57,20 @@ namespace MOneClickDownloads.Service
         /// <param name="modName">参考模组名称</param>
         /// <returns>是否成功更新</returns>
         bool UpdateFolderMetadata(string folderPath, List<string> mcVersions, List<string> loaders, string? projectId, string? modName);
+
+        /// <summary>
+        /// 获取文件夹的持久化模组元数据列表
+        /// </summary>
+        /// <param name="folderPath">文件夹完整路径</param>
+        /// <returns>持久化的模组元数据列表；文件夹不存在时返回空列表</returns>
+        List<LocalModEntry> GetModEntries(string folderPath);
+
+        /// <summary>
+        /// 更新文件夹的持久化模组元数据（全量替换）
+        /// </summary>
+        /// <param name="folderPath">文件夹完整路径</param>
+        /// <param name="entries">新的模组元数据列表</param>
+        /// <returns>是否成功更新</returns>
+        bool UpdateModEntries(string folderPath, List<LocalModEntry> entries);
     }
 }

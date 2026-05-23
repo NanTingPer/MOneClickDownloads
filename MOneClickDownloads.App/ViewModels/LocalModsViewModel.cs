@@ -136,6 +136,12 @@ namespace MOneClickDownloads.App.ViewModels
         [ObservableProperty]
         private bool _isRefreshingMetadata;
 
+        /// <summary>
+        /// 是否正在更新模组元数据（从 API 获取 ProjectId/Description/IconUrl 等信息）
+        /// </summary>
+        [ObservableProperty]
+        private bool _isUpdatingModMetadata;
+
         private CancellationTokenSource? _updateCts;
 
         /// <summary>
@@ -293,13 +299,34 @@ namespace MOneClickDownloads.App.ViewModels
                 var inventory = new LocalModInventory(SelectedFolder.FolderPath, _analysisService);
                 await inventory.ScanAsync();
 
-                var items = inventory.InstalledMods.Select(mod => new LocalModDisplayItem
+                // 加载持久化的模组元数据
+                var persistentEntries = _folderService.GetModEntries(SelectedFolder.FolderPath);
+                var entryMap = persistentEntries
+                    .Where(e => !string.IsNullOrEmpty(e.ModId))
+                    .ToDictionary(e => e.ModId, StringComparer.OrdinalIgnoreCase);
+
+                var items = inventory.InstalledMods.Select(mod =>
                 {
-                    ModId = mod.ModId,
-                    DisplayName = mod.Name,
-                    DisplayDescription = string.Empty,
-                    CurrentVersion = mod.Version,
-                    FilePath = inventory.GetModFilePath(mod.ModId) ?? string.Empty,
+                    entryMap.TryGetValue(mod.ModId, out var entry);
+
+                    // 从持久化数据恢复缓存图标路径
+                    var cachedIconPath = !string.IsNullOrEmpty(entry?.IconUrl)
+                        ? _iconCacheService.GetCachedIconPath(mod.ModId, entry.IconUrl)
+                        : null;
+
+                    return new LocalModDisplayItem
+                    {
+                        ModId = mod.ModId,
+                        DisplayName = entry?.Title ?? mod.Name,
+                        DisplayDescription = entry?.Description ?? string.Empty,
+                        CurrentVersion = mod.Version,
+                        FilePath = inventory.GetModFilePath(mod.ModId) ?? string.Empty,
+                        ProjectId = entry?.ProjectId,
+                        Slug = entry?.Slug,
+                        IconUrl = cachedIconPath ?? entry?.IconUrl,
+                        Downloads = entry?.Downloads ?? 0,
+                        ProjectType = entry?.ProjectType ?? ProjectType.Mod,
+                    };
                 }).ToList();
 
                 ModItems = new ObservableCollection<LocalModDisplayItem>(items);
@@ -311,8 +338,8 @@ namespace MOneClickDownloads.App.ViewModels
                     EmptyMessage = "此文件夹中没有识别到模组文件";
                 }
 
-                // 异步补充项目信息（图标、项目ID等）
-                _ = Task.Run(async () => await EnrichModInfoAsync(items));
+                // 注意：不再自动调用 EnrichModInfoAsync。
+                // 用户需要点击"更新模组元数据"按钮来手动从 API 获取/刷新模组信息。
 
                 // 构建加载器选项（从本地 JAR 的 LoaderType 提取）
                 // 仅当持久化的加载器列表为空时才从本地提取
@@ -354,65 +381,121 @@ namespace MOneClickDownloads.App.ViewModels
         }
 
         /// <summary>
-        /// 异步补充模组项目信息（通过 Modrinth API 搜索）
+        /// 更新模组元数据（通过 Modrinth API 搜索每个模组，获取 ProjectId/Description/IconUrl 等信息并持久化）。
         /// </summary>
-        private async Task EnrichModInfoAsync(List<LocalModDisplayItem> items)
+        [RelayCommand]
+        private async Task UpdateModMetadataAsync()
         {
-            Logger.Information("开始异步补充模组项目信息: {Count} 个", items.Count);
-
-            foreach (var item in items)
+            if (SelectedFolder == null)
             {
-                try
-                {
-                    // 用模组名称搜索 Modrinth
-                    var searchResult = await _apiService.SearchProjectsAsync(
-                        item.DisplayName, null, null, 0, 5);
-
-                    var hit = searchResult.Hits
-                        .FirstOrDefault(h =>
-                            string.Equals(h.Title, item.DisplayName, StringComparison.OrdinalIgnoreCase) ||
-                            string.Equals(h.Slug, item.ModId, StringComparison.OrdinalIgnoreCase));
-
-                    if (hit != null)
-                    {
-                        // 优先使用本地缓存图标
-                        var cachedIconPath = !string.IsNullOrEmpty(hit.IconUrl)
-                            ? _iconCacheService.GetCachedIconPath(item.ModId, hit.IconUrl)
-                            : null;
-
-                        var iconToSet = cachedIconPath ?? hit.IconUrl;
-
-                        await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
-                        {
-                            item.ProjectId = hit.ProjectId;
-                            item.Slug = hit.Slug;
-                            item.IconUrl = iconToSet;
-                            item.Downloads = hit.Downloads;
-                            item.ProjectType = hit.ProjectType;
-                            if (!string.IsNullOrEmpty(hit.Description))
-                                item.DisplayDescription = hit.Description;
-                        });
-
-                        // 后台缓存/更新图标（无论是否已缓存，都执行以更新缓存）
-                        if (!string.IsNullOrEmpty(hit.IconUrl))
-                        {
-                            _ = Task.Run(async () => await _iconCacheService.CacheIconAsync(item.ModId, hit.IconUrl));
-                        }
-
-                        Logger.Debug("补充模组信息成功: {ModId} -> ProjectId={ProjectId}", item.ModId, hit.ProjectId);
-                    }
-                    else
-                    {
-                        Logger.Debug("未能在 Modrinth 找到模组: {ModId} ({Name})", item.ModId, item.DisplayName);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Logger.Warning(ex, "补充模组信息失败: {ModId}", item.ModId);
-                }
+                StatusMessage = "请先选择一个文件夹";
+                return;
             }
 
-            Logger.Information("模组项目信息补充完成");
+            var items = ModItems.ToList();
+            if (items.Count == 0)
+            {
+                StatusMessage = "当前文件夹没有模组";
+                return;
+            }
+
+            Logger.Information("开始更新模组元数据: {Path}, {Count} 个模组", SelectedFolder.FolderPath, items.Count);
+            IsUpdatingModMetadata = true;
+            StatusMessage = "正在更新模组元数据...";
+
+            try
+            {
+                foreach (var item in items)
+                {
+                    try
+                    {
+                        // 用模组名称搜索 Modrinth
+                        var searchResult = await _apiService.SearchProjectsAsync(
+                            item.DisplayName, null, null, 0, 5);
+
+                        var hit = searchResult.Hits
+                            .FirstOrDefault(h =>
+                                string.Equals(h.Title, item.DisplayName, StringComparison.OrdinalIgnoreCase) ||
+                                string.Equals(h.Slug, item.ModId, StringComparison.OrdinalIgnoreCase));
+
+                        if (hit != null)
+                        {
+                            // 优先使用本地缓存图标
+                            var cachedIconPath = !string.IsNullOrEmpty(hit.IconUrl)
+                                ? _iconCacheService.GetCachedIconPath(item.ModId, hit.IconUrl)
+                                : null;
+
+                            var iconToSet = cachedIconPath ?? hit.IconUrl;
+
+                            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+                            {
+                                item.ProjectId = hit.ProjectId;
+                                item.Slug = hit.Slug;
+                                item.IconUrl = iconToSet;
+                                item.Downloads = hit.Downloads;
+                                item.ProjectType = hit.ProjectType;
+                                if (!string.IsNullOrEmpty(hit.Description))
+                                    item.DisplayDescription = hit.Description;
+                            });
+
+                            // 后台缓存/更新图标（无论是否已缓存，都执行以更新缓存）
+                            if (!string.IsNullOrEmpty(hit.IconUrl))
+                            {
+                                _ = Task.Run(async () => await _iconCacheService.CacheIconAsync(item.ModId, hit.IconUrl));
+                            }
+
+                            Logger.Debug("补充模组信息成功: {ModId} -> ProjectId={ProjectId}", item.ModId, hit.ProjectId);
+                        }
+                        else
+                        {
+                            Logger.Debug("未能在 Modrinth 找到模组: {ModId} ({Name})", item.ModId, item.DisplayName);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Warning(ex, "补充模组信息失败: {ModId}", item.ModId);
+                    }
+                }
+
+                // 持久化当前所有模组元数据
+                PersistModEntries(items);
+                StatusMessage = $"模组元数据已更新: {items.Count} 个模组";
+                Logger.Information("模组元数据更新完成并持久化: {Count} 个", items.Count);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "更新模组元数据失败");
+                StatusMessage = $"更新模组元数据失败: {ex.Message}";
+            }
+            finally
+            {
+                IsUpdatingModMetadata = false;
+            }
+        }
+
+        /// <summary>
+        /// 将当前 ModItems 的元数据持久化到文件夹记录。
+        /// </summary>
+        private void PersistModEntries(List<LocalModDisplayItem> items)
+        {
+            if (SelectedFolder == null) return;
+
+            var entries = items.Select(item => new LocalModEntry
+            {
+                ModId = item.ModId,
+                FileName = Path.GetFileName(item.FilePath) ?? string.Empty,
+                Title = item.DisplayName,
+                ProjectId = item.ProjectId,
+                Description = item.DisplayDescription,
+                Slug = item.Slug,
+                IconUrl = item.IconUrl,
+                Downloads = item.Downloads,
+                ProjectType = item.ProjectType,
+                LocalVersion = item.CurrentVersion,
+                UpdatedAt = DateTime.UtcNow,
+            }).ToList();
+
+            _folderService.UpdateModEntries(SelectedFolder.FolderPath, entries);
         }
 
         /// <summary>

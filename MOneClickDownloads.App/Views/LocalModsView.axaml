@@ -58,6 +58,13 @@
                         DockPanel.Dock="Right"
                         Padding="12,6" FontSize="14"
                         Margin="0,0,8,0"/>
+                <!-- 更新模组元数据按钮 -->
+                <Button Content="📝 更新模组元数据"
+                        Command="{Binding UpdateModMetadataCommand}"
+                        DockPanel.Dock="Right"
+                        Padding="12,6" FontSize="14"
+                        Margin="0,0,8,0"
+                        IsEnabled="{Binding !IsUpdatingModMetadata}"/>
                 <!-- 更新筛选元数据按钮 -->
                 <Button Content="📊 更新筛选元数据"
                         Command="{Binding RefreshFilterMetadataCommand}"

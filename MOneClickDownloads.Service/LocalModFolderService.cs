@@ -222,6 +222,49 @@ namespace MOneClickDownloads.Service
             }
         }
 
+        /// <inheritdoc />
+        public List<LocalModEntry> GetModEntries(string folderPath)
+        {
+            if (string.IsNullOrWhiteSpace(folderPath)) return new List<LocalModEntry>();
+
+            folderPath = Path.GetFullPath(folderPath.Trim());
+
+            lock (_lock)
+            {
+                var entry = _entries.FirstOrDefault(e =>
+                    string.Equals(e.FolderPath, folderPath, StringComparison.OrdinalIgnoreCase));
+                return entry?.ModEntries?.ToList() ?? new List<LocalModEntry>();
+            }
+        }
+
+        /// <inheritdoc />
+        public bool UpdateModEntries(string folderPath, List<LocalModEntry> entries)
+        {
+            if (string.IsNullOrWhiteSpace(folderPath)) return false;
+
+            folderPath = Path.GetFullPath(folderPath.Trim());
+
+            lock (_lock)
+            {
+                var entry = _entries.FirstOrDefault(e =>
+                    string.Equals(e.FolderPath, folderPath, StringComparison.OrdinalIgnoreCase));
+
+                if (entry == null)
+                {
+                    _logger.Debug("文件夹不存在，跳过模组元数据更新: {Path}", folderPath);
+                    return false;
+                }
+
+                entry.ModEntries = entries ?? new List<LocalModEntry>();
+                Save();
+                _logger.Information("已更新文件夹模组元数据: {Path}, {Count} 条记录",
+                    folderPath, entry.ModEntries.Count);
+            }
+
+            Changed?.Invoke(this, EventArgs.Empty);
+            return true;
+        }
+
         /// <summary>
         /// 保存文件夹列表到 JSON 文件
         /// </summary>
