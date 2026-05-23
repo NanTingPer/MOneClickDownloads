@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace MOneClickDownloads.App.Models
 {
@@ -6,7 +7,7 @@ namespace MOneClickDownloads.App.Models
     /// 收藏夹合集分组，用于在UI中按合集名称分组展示收藏列表。
     /// 对应 McVersionGroup 在版本列表中的角色。
     /// </summary>
-    public class FavoriteGroup
+    public partial class FavoriteGroup : ObservableObject
     {
         /// <summary>
         /// 合集唯一标识
@@ -27,5 +28,11 @@ namespace MOneClickDownloads.App.Models
         /// 合集中的模组数量
         /// </summary>
         public int ItemCount => Items.Count;
+
+        /// <summary>
+        /// 收藏夹是否展开（用于在重新加载数据后保留展开/折叠状态）
+        /// </summary>
+        [ObservableProperty]
+        private bool _isExpanded;
     }
 }

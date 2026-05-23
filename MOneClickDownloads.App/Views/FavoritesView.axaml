@@ -12,25 +12,25 @@
     <DockPanel>
         <!-- 顶部：返回按钮 + 标题 -->
         <Border DockPanel.Dock="Top" Padding="16,12">
-            <StackPanel Spacing="8">
+            <DockPanel>
                 <!-- 返回按钮 -->
                 <Button Content="← 返回搜索" 
                         Command="{Binding GoBackCommand}"
                         HorizontalAlignment="Left"
+                        DockPanel.Dock="Left"
                         Padding="8,4"/>
-                
-                <!-- 标题行：标题 + 创建按钮 -->
-                <DockPanel>
-                    <TextBlock Text="我的收藏夹" 
-                               FontSize="22" FontWeight="Bold"
-                               DockPanel.Dock="Left"/>
-                    <Button Content="＋ 创建收藏夹"
-                            Click="OnCreateCollectionClick"
-                            DockPanel.Dock="Right"
-                            Padding="12,6"
-                            FontSize="14"/>
-                </DockPanel>
-            </StackPanel>
+                <!-- 创建收藏夹按钮（最右侧） -->
+                <Button Content="＋ 创建收藏夹"
+                        Click="OnCreateCollectionClick"
+                        DockPanel.Dock="Right"
+                        Padding="12,6"
+                        FontSize="14"/>
+                <!-- 标题 -->
+                <TextBlock Text="我的收藏夹" 
+                           FontSize="22" FontWeight="Bold"
+                           VerticalAlignment="Center"
+                           Margin="8,4,0,0"/>
+            </DockPanel>
         </Border>
 
         <!-- 中部：收藏列表 -->
@@ -69,6 +69,7 @@
                             <StackPanel>
                                 <!-- 合集分组头 — 与版本列表的 MajorVersion 分组头一致 -->
                                 <ToggleButton x:Name="GroupToggle"
+                                             IsChecked="{Binding IsExpanded}"
                                              Padding="12,10"
                                              HorizontalAlignment="Stretch"
                                              HorizontalContentAlignment="Stretch"
@@ -82,6 +83,11 @@
                                                       CommandParameter="{Binding}"/>
                                             <MenuItem Header="下载此合集"
                                                       Command="{Binding #FavoriteList.DataContext.DownloadCollectionCommand}"
+                                                      CommandParameter="{Binding}"/>
+                                            <Separator/>
+                                            <MenuItem Header="删除"
+                                                      Foreground="Red"
+                                                      Command="{Binding #FavoriteList.DataContext.DeleteCollectionCommand}"
                                                       CommandParameter="{Binding}"/>
                                         </ContextMenu>
                                     </ToggleButton.ContextMenu>
@@ -99,7 +105,7 @@
                                 </ToggleButton>
                                 <!-- 合集内的模组条目列表 -->
                                 <ItemsControl ItemsSource="{Binding Items}"
-                                             IsVisible="{Binding IsChecked, ElementName=GroupToggle}"
+                                             IsVisible="{Binding IsExpanded}"
                                              HorizontalAlignment="Stretch">
                                     <ItemsControl.ItemsPanel>
                                         <ItemsPanelTemplate>

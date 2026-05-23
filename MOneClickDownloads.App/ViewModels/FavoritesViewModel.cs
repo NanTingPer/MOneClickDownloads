@@ -75,6 +75,9 @@ namespace MOneClickDownloads.App.ViewModels
         {
             try
             {
+                // 记录当前各合集的展开状态
+                var expandedStates = FavoriteGroups.ToDictionary(g => g.CollectionId, g => g.IsExpanded);
+
                 IsLoading = true;
 
                 var collections = _favoriteService.GetAllCollections();
@@ -82,6 +85,7 @@ namespace MOneClickDownloads.App.ViewModels
                 {
                     CollectionId = c.Id,
                     CollectionName = c.Name,
+                    IsExpanded = expandedStates.TryGetValue(c.Id, out var expanded) && expanded,
                     Items = c.Items.Select(item => new FavoriteDisplayItem
                     {
                         Item = item,
@@ -214,6 +218,40 @@ namespace MOneClickDownloads.App.ViewModels
             catch (Exception ex)
             {
                 Logger.Error(ex, "重命名收藏夹失败: CollectionId={Id}", group.CollectionId);
+            }
+            // Changed 事件会自动触发 LoadCollections
+        }
+
+        /// <summary>
+        /// 删除收藏夹：弹出确认对话框后删除整个合集
+        /// </summary>
+        [RelayCommand]
+        private async Task DeleteCollectionAsync(FavoriteGroup? group)
+        {
+            if (group == null) return;
+
+            Logger.Information("用户请求删除收藏夹: CollectionId={Id}, Name={Name}", group.CollectionId, group.CollectionName);
+
+            var owner = Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop
+                ? desktop.MainWindow
+                : null;
+
+            if (owner == null) return;
+
+            var dialog = new ConfirmDialog();
+            dialog.SetContent("确认删除", $"确定要删除收藏夹「{group.CollectionName}」吗？此操作不可撤销，其中所有模组条目都将被移除。");
+            var confirmed = await dialog.ShowDialog<bool>(owner);
+
+            if (!confirmed) return;
+
+            try
+            {
+                _favoriteService.DeleteCollection(group.CollectionId);
+                Logger.Information("已删除收藏夹: {Name}, Id={Id}", group.CollectionName, group.CollectionId);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "删除收藏夹失败: CollectionId={Id}", group.CollectionId);
             }
             // Changed 事件会自动触发 LoadCollections
         }
