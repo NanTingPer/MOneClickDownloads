@@ -126,42 +126,51 @@ namespace MOneClickDownloads.Service
         }
 
         /// <summary>
-        /// 构建缓存文件名：{modId}_{iconFileName}
-        /// 从 URL 中提取图标文件名部分，去除查询参数。
+        /// 构建缓存文件名：{modId}_icon.{ext}
+        /// 固定使用 "icon" 作为文件名，仅从 URL 提取扩展名。
+        /// 例如：https://cdn.modrinth.com/data/a1b2c3.png?hash=abc -> sodium_icon.png
         /// </summary>
         private static string BuildCacheFileName(string modId, string iconUrl)
         {
-            var iconFileName = ExtractIconFileName(iconUrl);
+            var ext = ExtractIconExtension(iconUrl);
             // 清理 modId 中的非法文件名字符
             var safeModId = SanitizeFileName(modId);
-            return $"{safeModId}_{iconFileName}";
+            return $"{safeModId}_icon.{ext}";
         }
 
         /// <summary>
-        /// 从 URL 提取图标文件名，去除查询参数和片段。
-        /// 例如：https://cdn.modrinth.com/data/icon.png?hash=abc -> icon.png
+        /// 从 URL 提取图标文件的扩展名（不含点号）。
+        /// 例如：https://cdn.modrinth.com/data/a1b2c3.png?hash=abc -> png
         /// </summary>
-        private static string ExtractIconFileName(string url)
+        private static string ExtractIconExtension(string url)
         {
             try
             {
                 var uri = new Uri(url);
-                var lastSegment = uri.Segments.LastOrDefault() ?? "icon.png";
+                var lastSegment = uri.Segments.LastOrDefault() ?? string.Empty;
+
+                // 去除查询参数尾部（Segments 不应包含 Query，但做防御处理）
+                var qIndex = lastSegment.IndexOf('?');
+                if (qIndex >= 0)
+                    lastSegment = lastSegment[..qIndex];
 
                 // URL decode
                 lastSegment = Uri.UnescapeDataString(lastSegment);
 
-                // 清理非法文件名字符
-                lastSegment = SanitizeFileName(lastSegment);
+                // 提取扩展名
+                var dotIndex = lastSegment.LastIndexOf('.');
+                if (dotIndex < 0 || dotIndex == lastSegment.Length - 1)
+                    return "png";
 
-                if (string.IsNullOrWhiteSpace(lastSegment))
-                    return "icon.png";
+                var ext = SanitizeFileName(lastSegment[(dotIndex + 1)..]);
+                if (string.IsNullOrWhiteSpace(ext))
+                    return "png";
 
-                return lastSegment;
+                return ext;
             }
             catch
             {
-                return "icon.png";
+                return "png";
             }
         }
 

@@ -27,6 +27,7 @@ namespace MOneClickDownloads.App.ViewModels
 
         private readonly INavigationService _navigation;
         private readonly IFavoriteService _favoriteService;
+        private readonly IIconCacheService _iconCacheService;
 
         /// <summary>
         /// 收藏夹分组列表
@@ -52,12 +53,13 @@ namespace MOneClickDownloads.App.ViewModels
         [ObservableProperty]
         private string _emptyMessage = "暂无收藏，可在模组详情页添加收藏";
 
-        public FavoritesViewModel(INavigationService navigation, IFavoriteService favoriteService)
+        public FavoritesViewModel(INavigationService navigation, IFavoriteService favoriteService, IIconCacheService iconCacheService)
         {
             Logger.Information("FavoritesViewModel 初始化开始");
 
             _navigation = navigation;
             _favoriteService = favoriteService;
+            _iconCacheService = iconCacheService;
 
             // 订阅收藏数据变更事件
             _favoriteService.Changed += OnFavoriteChanged;
@@ -86,21 +88,46 @@ namespace MOneClickDownloads.App.ViewModels
                     CollectionId = c.Id,
                     CollectionName = c.Name,
                     IsExpanded = expandedStates.TryGetValue(c.Id, out var expanded) && expanded,
-                    Items = c.Items.Select(item => new FavoriteDisplayItem
+                    Items = c.Items.Select(item =>
                     {
-                        Item = item,
-                        DisplayName = item.Title,
-                        DisplayDescription = item.Description,
-                        IconUrl = item.IconUrl,
-                        DisplayTypeTag = FavoriteDisplayItem.GetTypeTag(item.ProjectType),
-                        ProjectType = item.ProjectType,
-                        FormattedDownloads = FavoriteDisplayItem.FormatDownloads(item.Downloads),
-                        FormattedDate = item.FavoritedAt.ToLocalTime().ToString("yyyy-MM-dd")
+                        // 检查磁盘图标缓存，命中则使用本地路径（AsyncImage 支持加载本地文件）
+                        var iconUrl = item.IconUrl;
+                        if (!string.IsNullOrEmpty(iconUrl))
+                        {
+                            var cachedPath = _iconCacheService.GetCachedIconPath(item.Slug, iconUrl);
+                            if (cachedPath != null)
+                                iconUrl = cachedPath;
+                        }
+
+                        return new FavoriteDisplayItem
+                        {
+                            Item = item,
+                            DisplayName = item.Title,
+                            DisplayDescription = item.Description,
+                            IconUrl = iconUrl,
+                            DisplayTypeTag = FavoriteDisplayItem.GetTypeTag(item.ProjectType),
+                            ProjectType = item.ProjectType,
+                            FormattedDownloads = FavoriteDisplayItem.FormatDownloads(item.Downloads),
+                            FormattedDate = item.FavoritedAt.ToLocalTime().ToString("yyyy-MM-dd")
+                        };
                     }).ToList()
                 }).ToList();
 
                 FavoriteGroups = new ObservableCollection<FavoriteGroup>(groups);
                 HasItems = FavoriteGroups.Any(g => g.Items.Any());
+
+                // 后台缓存未命中磁盘缓存的图标
+                var iconItemsToCache = groups
+                    .SelectMany(g => g.Items)
+                    .Where(i => i.Item.IconUrl != null)
+                    .Where(i => string.IsNullOrEmpty(_iconCacheService.GetCachedIconPath(i.Item.Slug, i.Item.IconUrl!)))
+                    .Select(i => (i.Item.Slug, i.Item.IconUrl!))
+                    .DistinctBy(i => i.Slug)
+                    .ToList();
+                if (iconItemsToCache.Count > 0)
+                {
+                    _ = Task.Run(async () => await _iconCacheService.CacheIconsAsync(iconItemsToCache));
+                }
 
                 Logger.Information("收藏夹加载完成，共 {Count} 个合集", groups.Count);
             }
